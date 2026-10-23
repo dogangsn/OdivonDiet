@@ -1,0 +1,23 @@
+@use '@angular/material' as mat;
+
+:root {
+  @include mat.theme((color: (primary: mat.$violet-palette, tertiary: mat.$blue-palette), typography: "Plus Jakarta Sans", density: 0));
+  color-scheme: light;
+  font-family: "Plus Jakarta Sans", sans-serif;
+}
+
+:root.dark { color-scheme: dark; }
+* { box-sizing: border-box; }
+html, body { min-height: 100%; margin: 0; }
+body { background: #f8fafc; color: #0f172a; }
+.dark body { background: #0b1120; color: #f8fafc; }
+button, input, select { font: inherit; }
+button { cursor: pointer; border: 0; }
+.material-symbols-rounded { font-size: 20px; line-height: 1; }
+.custom-scroll { scrollbar-width: thin; scrollbar-color: #94a3b8 transparent; }
+.rtl .directional-icon { transform: scaleX(-1); }
+
+.odv-swal-popup { border-radius: 1rem !important; font-family: "Plus Jakarta Sans", sans-serif !important; }
+.odv-swal-confirm { border-radius: .75rem !important; background: #6d28d9 !important; }
+.odv-swal-danger { border-radius: .75rem !important; background: #dc2626 !important; }
+.odv-swal-cancel { border-radius: .75rem !important; background: #e2e8f0 !important; color: #334155 !important; }

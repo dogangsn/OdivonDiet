@@ -1,0 +1,74 @@
+<div class="min-h-screen bg-slate-50 text-slate-900 dark:bg-[#0b1120] dark:text-slate-100">
+  <a href="#main" class="sr-only focus:not-sr-only focus:fixed focus:start-4 focus:top-4 focus:z-[80] odv-btn-primary">İçeriğe geç</a>
+  <aside class="fixed inset-y-0 start-0 z-30 hidden w-64 border-e border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900 lg:block">
+    <div class="mb-8 flex items-center gap-3">
+      <div class="grid size-10 place-items-center rounded-xl bg-violet-600 text-white"><span class="material-symbols-rounded">verified</span></div>
+      <div><strong class="block">Odivon</strong><span class="text-xs text-slate-500">{{ product.name }}</span></div>
+    </div>
+    <nav aria-label="Ana menü" class="space-y-1">
+      @for (item of [['dashboard','nav.overview'],['extension','nav.modules'],['history','nav.activity'],['settings','nav.settings']]; track item[1]) {
+        <a href="#" class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold first:bg-violet-50 first:text-violet-700 dark:first:bg-violet-500/10 dark:first:text-violet-300">
+          <span class="material-symbols-rounded">{{ item[0] }}</span>{{ item[1] | t }}
+        </a>
+      }
+    </nav>
+  </aside>
+
+  <div class="lg:ms-64">
+    <header class="sticky top-0 z-20 flex min-h-16 items-center justify-between border-b border-slate-200 bg-white/90 px-4 backdrop-blur dark:border-slate-800 dark:bg-slate-900/90 sm:px-6">
+      <div class="flex items-center gap-2"><span class="material-symbols-rounded text-violet-600">shield</span><span class="font-bold">{{ product.name }}</span></div>
+      <div class="flex items-center gap-2">
+        <label class="sr-only" for="language">Dil</label>
+        <select id="language" class="odv-input !w-auto" [value]="i18n.currentLang()" (change)="setLanguage($any($event.target).value)">
+          @for (language of i18n.options; track language.code) { <option [value]="language.code">{{ language.flag }} {{ language.nativeName }}</option> }
+        </select>
+        <button type="button" class="odv-icon-btn" (click)="toggleTheme()" [attr.aria-label]="dark() ? 'Açık temaya geç' : 'Koyu temaya geç'">
+          <span class="material-symbols-rounded">{{ dark() ? 'light_mode' : 'dark_mode' }}</span>
+        </button>
+      </div>
+    </header>
+
+    <main id="main" class="mx-auto max-w-[1500px] space-y-6 p-4 sm:p-6 lg:p-8">
+      <app-page-header [eyebrow]="product.categoryKey | t" [title]="product.taglineKey | t" [description]="product.promiseKey | t">
+        <button actions type="button" class="odv-btn-primary" (click)="drawerOpen.set(true)"><span class="material-symbols-rounded">add</span>{{ 'common.new' | t }}</button>
+      </app-page-header>
+
+      <section aria-labelledby="radar-title" class="odv-card overflow-hidden bg-gradient-to-br from-slate-950 via-violet-950 to-blue-950 p-6 text-white lg:p-8">
+        <div class="grid gap-8 lg:grid-cols-[1.4fr_1fr] lg:items-center">
+          <div><div class="mb-3 inline-flex items-center gap-2 rounded-full bg-emerald-400/10 px-3 py-1 text-xs font-bold text-emerald-300"><span class="size-2 rounded-full bg-emerald-400"></span>{{ 'dashboard.online' | t }}</div><h2 id="radar-title" class="m-0 text-2xl font-extrabold">{{ 'dashboard.live' | t }}</h2><p class="max-w-2xl text-sm leading-6 text-slate-300">{{ product.promiseKey | t }}</p></div>
+          <div class="grid grid-cols-3 gap-3 text-center">
+            <div class="rounded-2xl bg-white/10 p-4"><strong class="block text-2xl">98%</strong><span class="text-xs text-slate-300">{{ 'dashboard.health' | t }}</span></div>
+            <div class="rounded-2xl bg-white/10 p-4"><strong class="block text-2xl">76%</strong><span class="text-xs text-slate-300">{{ 'dashboard.capacity' | t }}</span></div>
+            <div class="rounded-2xl bg-white/10 p-4"><strong class="block text-2xl">42</strong><span class="text-xs text-slate-300">{{ 'dashboard.today' | t }}</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section aria-label="Temel göstergeler" class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        @for (metric of product.metrics; track metric.labelKey) {
+          <article class="odv-card p-5"><div class="mb-4 flex items-center justify-between"><span class="text-sm font-bold text-slate-500">{{ metric.labelKey | t }}</span><span class="material-symbols-rounded text-violet-600">monitoring</span></div><strong class="block text-3xl">{{ metric.value }}</strong><span class="mt-2 block text-xs text-slate-500">{{ metric.noteKey | t }}</span></article>
+        }
+      </section>
+
+      <section class="odv-card p-5 sm:p-6" aria-labelledby="modules-title">
+        <div class="mb-5"><h2 id="modules-title" class="m-0 text-xl font-extrabold">{{ 'module.title' | t }}</h2><p class="mt-1 text-sm text-slate-500">{{ 'module.subtitle' | t }}</p></div>
+        <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          @for (module of product.modules; track module.nameKey) { <article class="rounded-2xl border border-slate-200 p-4 dark:border-slate-700"><div class="mb-3 flex items-center justify-between"><span class="grid size-10 place-items-center rounded-xl bg-violet-50 text-violet-700 dark:bg-violet-500/10 dark:text-violet-300"><span class="material-symbols-rounded">{{ module.icon }}</span></span><span class="text-xs font-bold text-slate-400">Faz {{ module.phase }}</span></div><h3 class="text-sm font-extrabold">{{ module.nameKey | t }}</h3><p class="text-xs leading-5 text-slate-500">{{ module.descriptionKey | t }}</p></article> }
+        </div>
+      </section>
+
+      <section class="odv-card overflow-hidden" aria-labelledby="records-title">
+        <div class="flex flex-col gap-4 border-b border-slate-200 p-5 dark:border-slate-700 md:flex-row md:items-center md:justify-between">
+          <div><h2 id="records-title" class="m-0 text-xl font-extrabold">{{ 'table.name' | t }}</h2><div class="mt-3 inline-flex rounded-xl bg-slate-100 p-1 dark:bg-slate-900"><button type="button" class="rounded-lg px-3 py-2 text-xs font-bold" [class.bg-white]="!archived()" [class.shadow-sm]="!archived()" (click)="archived.set(false)">{{ 'common.active' | t }}</button><button type="button" class="rounded-lg px-3 py-2 text-xs font-bold" [class.bg-white]="archived()" [class.shadow-sm]="archived()" (click)="archived.set(true)">{{ 'common.archive' | t }}</button></div></div>
+          <label class="relative block md:w-80"><span class="sr-only">{{ 'common.search' | t }}</span><span class="material-symbols-rounded pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-slate-400">search</span><input class="odv-input ps-10" type="search" [placeholder]="'common.search' | t" [value]="search()" (input)="search.set($any($event.target).value)" /></label>
+        </div>
+        @if (filtered().length) {
+          <div class="overflow-x-auto"><table class="w-full min-w-[680px]"><thead><tr><th class="odv-th">{{ 'table.name' | t }}</th><th class="odv-th">Lokasyon</th><th class="odv-th">{{ 'table.status' | t }}</th><th class="odv-th">Güncellendi</th><th class="odv-th"><span class="sr-only">İşlemler</span></th></tr></thead><tbody>@for (row of filtered(); track row.id) { <tr><td class="odv-td font-bold">{{ row.name }}</td><td class="odv-td text-slate-500">{{ row.location }}</td><td class="odv-td"><span [class]="row.status === 'active' ? 'odv-badge-success' : 'odv-badge-warning'">{{ row.status === 'active' ? 'Aktif' : 'Bekliyor' }}</span></td><td class="odv-td text-slate-500">{{ row.updated }}</td><td class="odv-td text-end"><button class="odv-icon-btn" type="button" aria-label="Kaydı aç"><span class="material-symbols-rounded directional-icon">arrow_forward</span></button></td></tr> }</tbody></table></div>
+        } @else { <div class="p-12 text-center"><span class="material-symbols-rounded mb-3 text-5xl text-slate-300">inbox</span><h3>{{ 'empty.title' | t }}</h3><p class="text-sm text-slate-500">{{ 'empty.body' | t }}</p></div> }
+      </section>
+    </main>
+  </div>
+
+  @if (version.updateRequired()) { <div class="fixed inset-0 z-[70] grid place-items-center bg-slate-950/70 p-4" role="dialog" aria-modal="true" aria-labelledby="update-title"><section class="odv-card max-w-md p-7 text-center"><span class="material-symbols-rounded mb-3 text-5xl text-violet-600">system_update</span><h2 id="update-title">{{ 'update.title' | t }}</h2><p class="text-sm text-slate-500">{{ 'update.body' | t }}</p><button type="button" class="odv-btn-primary mt-3 w-full" (click)="version.applyUpdate()">{{ 'update.action' | t }}</button></section></div> }
+  <app-slide-over [open]="drawerOpen()" [dirty]="!!draftName()" [title]="'drawer.title' | t" (closed)="drawerOpen.set(false)" (submitted)="save()"><label class="block"><span class="mb-2 block text-sm font-bold">{{ 'drawer.name' | t }}</span><input #draft class="odv-input" [value]="draftName()" (input)="draftName.set(draft.value)" autocomplete="off" /></label></app-slide-over>
+</div>

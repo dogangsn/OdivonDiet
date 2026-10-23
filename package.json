@@ -1,0 +1,45 @@
+{
+  "name": "odivon-diet",
+  "version": "0.0.0",
+  "scripts": {
+    "ng": "ng",
+    "prestart": "node scripts/write-version.mjs",
+    "start": "ng serve",
+    "prebuild": "node scripts/write-version.mjs",
+    "build": "ng build",
+    "watch": "ng build --watch --configuration development",
+    "test": "ng test",
+    "contract": "vitest run src/app/core/api/api.contract.spec.ts",
+    "typecheck": "tsc -p tsconfig.app.json --noEmit",
+    "check": "npm run typecheck && npm test -- --watch=false && npm run contract && npm run build"
+  },
+  "private": true,
+  "packageManager": "npm@11.16.0",
+  "dependencies": {
+    "@angular/cdk": "^22.2.2",
+    "@angular/common": "^22.2.0",
+    "@angular/compiler": "^22.2.0",
+    "@angular/core": "^22.2.0",
+    "@angular/forms": "^22.2.0",
+    "@angular/material": "^22.2.2",
+    "@angular/platform-browser": "^22.2.0",
+    "@angular/router": "^22.2.0",
+    "firebase": "^12.4.0",
+    "rxjs": "~7.8.0",
+    "sweetalert2": "^11.26.25",
+    "tslib": "^2.3.0"
+  },
+  "devDependencies": {
+    "@angular/build": "^22.2.3",
+    "@angular/cli": "^22.2.3",
+    "@angular/compiler-cli": "^22.2.0",
+    "@tailwindcss/postcss": "^4.1.14",
+    "axe-core": "^4.14.0",
+    "jsdom": "^30.0.0",
+    "postcss": "^8.5.6",
+    "prettier": "^3.8.1",
+    "tailwindcss": "^4.1.14",
+    "typescript": "~6.0.2",
+    "vitest": "^5.0.0"
+  }
+}
