@@ -2,6 +2,8 @@
 
 # Compiled output
 /dist
+/src/app/core/version/build-info.ts
+/public/version.json
 /tmp
 /out-tsc
 /bazel-out

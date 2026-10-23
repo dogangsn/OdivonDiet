@@ -5,6 +5,8 @@
     "ng": "ng",
     "prestart": "node scripts/write-version.mjs",
     "start": "ng serve",
+    "pretypecheck": "node scripts/write-version.mjs",
+    "pretest": "node scripts/write-version.mjs",
     "prebuild": "node scripts/write-version.mjs",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",

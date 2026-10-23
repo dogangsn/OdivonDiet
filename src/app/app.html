@@ -55,7 +55,10 @@
         <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           @for (module of product.modules; track module.nameKey) { <article class="rounded-2xl border border-slate-200 p-4 dark:border-slate-700"><div class="mb-3 flex items-center justify-between"><span class="grid size-10 place-items-center rounded-xl bg-violet-50 text-violet-700 dark:bg-violet-500/10 dark:text-violet-300"><span class="material-symbols-rounded">{{ module.icon }}</span></span><span class="text-xs font-bold text-slate-400">Faz {{ module.phase }}</span></div><h3 class="text-sm font-extrabold">{{ module.nameKey | t }}</h3><p class="text-xs leading-5 text-slate-500">{{ module.descriptionKey | t }}</p></article> }
         </div>
+        <a routerLink="/workspace" class="odv-btn-soft mt-5"><span class="material-symbols-rounded directional-icon">arrow_forward</span>Çalışma alanını aç</a>
       </section>
+
+      <router-outlet />
 
       <section class="odv-card overflow-hidden" aria-labelledby="records-title">
         <div class="flex flex-col gap-4 border-b border-slate-200 p-5 dark:border-slate-700 md:flex-row md:items-center md:justify-between">
@@ -70,5 +73,5 @@
   </div>
 
   @if (version.updateRequired()) { <div class="fixed inset-0 z-[70] grid place-items-center bg-slate-950/70 p-4" role="dialog" aria-modal="true" aria-labelledby="update-title"><section class="odv-card max-w-md p-7 text-center"><span class="material-symbols-rounded mb-3 text-5xl text-violet-600">system_update</span><h2 id="update-title">{{ 'update.title' | t }}</h2><p class="text-sm text-slate-500">{{ 'update.body' | t }}</p><button type="button" class="odv-btn-primary mt-3 w-full" (click)="version.applyUpdate()">{{ 'update.action' | t }}</button></section></div> }
-  <app-slide-over [open]="drawerOpen()" [dirty]="!!draftName()" [title]="'drawer.title' | t" (closed)="drawerOpen.set(false)" (submitted)="save()"><label class="block"><span class="mb-2 block text-sm font-bold">{{ 'drawer.name' | t }}</span><input #draft class="odv-input" [value]="draftName()" (input)="draftName.set(draft.value)" autocomplete="off" /></label></app-slide-over>
+  <app-slide-over [open]="drawerOpen()" [dirty]="!!draftModel().name" [title]="'drawer.title' | t" (closed)="drawerOpen.set(false)" (submitted)="save()"><label class="block"><span class="mb-2 block text-sm font-bold">{{ 'drawer.name' | t }}</span><input class="odv-input" [formField]="draftForm.name" autocomplete="off" /></label></app-slide-over>
 </div>
