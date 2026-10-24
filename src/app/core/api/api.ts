@@ -22,4 +22,4 @@ export const clientVersionInterceptor: HttpInterceptorFn = (req, next) => {
   );
 };
 export function provideOdivonApi():EnvironmentProviders{return makeEnvironmentProviders([provideHttpClient(withInterceptors([clientVersionInterceptor]))]);}
-@Injectable({providedIn:'root'}) export class ApiConfig { readonly baseUrl=environment.mainApiUrl; }
+@Injectable({providedIn:'root'}) export class ApiConfig { readonly baseUrl=environment.apiBaseUrl; }
