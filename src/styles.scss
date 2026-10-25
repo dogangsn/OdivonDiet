@@ -9,8 +9,8 @@
 :root.dark { color-scheme: dark; }
 * { box-sizing: border-box; }
 html, body { min-height: 100%; margin: 0; }
-body { background: #f8fafc; color: #0f172a; }
-.dark body { background: #0b1120; color: #f8fafc; }
+body { background: radial-gradient(circle at 82% -10%, rgb(124 58 237 / .09), transparent 28rem), #f8fafc; color: #0f172a; }
+.dark body { background: radial-gradient(circle at 82% -10%, rgb(124 58 237 / .16), transparent 30rem), #0b1120; color: #f8fafc; }
 button, input, select { font: inherit; }
 button { cursor: pointer; border: 0; }
 .material-symbols-rounded { font-size: 20px; line-height: 1; }
