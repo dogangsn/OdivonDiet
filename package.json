@@ -13,7 +13,9 @@
     "test": "ng test",
     "contract": "vitest run src/app/core/api/api.contract.spec.ts",
     "typecheck": "tsc -p tsconfig.app.json --noEmit",
-    "check": "npm run typecheck && npm test -- --watch=false && npm run contract && npm run build"
+    "check": "npm run typecheck && npm test -- --watch=false && npm run contract && npm run build",
+    "deploy": "npm run build && wrangler deploy",
+    "preview": "npm run build && wrangler dev"
   },
   "private": true,
   "packageManager": "npm@11.16.0",
@@ -42,6 +44,7 @@
     "prettier": "^3.8.1",
     "tailwindcss": "^4.1.14",
     "typescript": "~6.0.2",
-    "vitest": "^5.0.0"
+    "vitest": "^5.0.0",
+    "wrangler": "^4.158.0"
   }
 }
