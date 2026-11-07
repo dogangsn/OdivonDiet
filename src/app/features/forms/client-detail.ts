@@ -1,7 +1,10 @@
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { Component, computed, inject } from '@angular/core';
 import Swal from 'sweetalert2';
+import { Router } from '@angular/router';
 import { DietStore } from '../../core/data/diet-store';
+import { PortalStore } from '../../core/data/portal-store';
+import { PORTAL_ACCESS_LABELS } from '../../domain/portal.models';
 import {
   ACTIVITY_LABELS,
   CHANNEL_ICONS,
@@ -108,6 +111,44 @@ import { QuickActions } from './quick-actions';
             <span class="text-xs text-slate-500"
               >BMR {{ v.bmr }} · {{ activityLabels[v.client.activity] }}</span
             >
+          </div>
+        </section>
+
+        <section class="odv-card p-5" aria-label="Danışan portalı">
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h4 class="odv-section-title text-sm">Danışan portalı</h4>
+              <p class="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                <span class="odv-badge" [class]="accessTone()">{{ accessLabels[access().status] }}</span>
+                @if (access().invitedAt && access().status === 'invited') {
+                  <span>Davet: {{ access().invitedAt | date: 'd MMM' }}</span>
+                }
+                <span>{{ portalStats().openTasks }} açık görev</span>
+                <span>{{ portalStats().openRequests }} açık talep</span>
+                @if (portalStats().unread) {
+                  <span class="font-bold text-violet-600">{{ portalStats().unread }} okunmamış mesaj</span>
+                }
+              </p>
+            </div>
+            <div class="flex flex-wrap gap-1.5">
+              <button type="button" class="odv-btn-soft" (click)="goToChat(v.client.id)">
+                <span class="material-symbols-rounded !text-base">forum</span>Mesaj
+              </button>
+              <button type="button" class="odv-btn-soft" (click)="qa.open('task', v.client.id)">
+                <span class="material-symbols-rounded !text-base">add_task</span>Görev ata
+              </button>
+              @if (access().status === 'active') {
+                <button type="button" class="odv-btn-ghost !min-h-9 text-rose-600" (click)="disablePortal()">
+                  Erişimi kapat
+                </button>
+              } @else {
+                <button type="button" class="odv-btn-primary !min-h-9" (click)="invite()">
+                  <span class="material-symbols-rounded !text-base">mail</span>{{
+                    access().status === 'none' ? 'Portala davet et' : 'Daveti yeniden gönder'
+                  }}
+                </button>
+              }
+            </div>
           </div>
         </section>
 
@@ -252,6 +293,9 @@ import { QuickActions } from './quick-actions';
 export class ClientDetail {
   readonly qa = inject(QuickActions);
   private readonly store = inject(DietStore);
+  private readonly portal = inject(PortalStore);
+  private readonly router = inject(Router);
+  readonly accessLabels = PORTAL_ACCESS_LABELS;
   readonly programLabels = PROGRAM_LABELS;
   readonly activityLabels = ACTIVITY_LABELS;
   readonly statusLabels = CLIENT_STATUS_LABELS;
@@ -290,6 +334,64 @@ export class ClientDetail {
       status === 'active' ? 'positive' : status === 'paused' ? 'warning' : 'neutral',
     );
   });
+
+  readonly access = computed(() => this.portal.accessFor(this.view()?.client.id ?? ''));
+  readonly accessTone = computed(() => {
+    const status = this.access().status;
+    return toneClass(status === 'active' ? 'positive' : status === 'invited' ? 'info' : 'neutral');
+  });
+  readonly portalStats = computed(() => {
+    const id = this.view()?.client.id;
+    const summary = this.portal.conversations().find((c) => c.clientId === id);
+    return {
+      openTasks: summary?.openTasks ?? 0,
+      openRequests: summary?.openRequests ?? 0,
+      unread: summary?.unread ?? 0,
+    };
+  });
+
+  goToChat(clientId: string): void {
+    this.qa.close();
+    void this.router.navigate(['/messages'], { queryParams: { client: clientId } });
+  }
+
+  async invite(): Promise<void> {
+    const v = this.view();
+    if (!v) return;
+    const result = await Swal.fire({
+      title: 'Portala davet edilsin mi?',
+      text: `${v.client.email} adresine giriş bağlantısı gönderilir. Danışan planını, ölçümlerini ve görevlerini görür, size mesaj yazabilir.`,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Davet gönder',
+      cancelButtonText: 'Vazgeç',
+      customClass: {
+        popup: 'odv-swal-popup',
+        confirmButton: 'odv-swal-confirm',
+        cancelButton: 'odv-swal-cancel',
+      },
+    });
+    if (result.isConfirmed) this.portal.invite(v.client.id);
+  }
+
+  async disablePortal(): Promise<void> {
+    const v = this.view();
+    if (!v) return;
+    const result = await Swal.fire({
+      title: 'Portal erişimi kapatılsın mı?',
+      text: `${v.fullName} portala giriş yapamaz. Mesaj geçmişi saklanır.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Erişimi kapat',
+      cancelButtonText: 'Vazgeç',
+      customClass: {
+        popup: 'odv-swal-popup',
+        confirmButton: 'odv-swal-danger',
+        cancelButton: 'odv-swal-cancel',
+      },
+    });
+    if (result.isConfirmed) this.portal.disable(v.client.id);
+  }
 
   async changeStatus(status: ClientStatus): Promise<void> {
     const v = this.view();

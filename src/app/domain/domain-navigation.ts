@@ -25,6 +25,14 @@ export const PRODUCT_NAVIGATION: readonly NavigationGroup[] = [
     ],
   },
   {
+    label: 'Danışan portalı',
+    items: [
+      { path: '/messages', icon: 'forum', label: 'Mesajlar' },
+      { path: '/requests', icon: 'inbox', label: 'Talepler' },
+      { path: '/tasks', icon: 'task_alt', label: 'Görevler' },
+    ],
+  },
+  {
     label: 'Sistem',
     items: [
       { path: '/activity', icon: 'history', label: 'Aktiviteler' },

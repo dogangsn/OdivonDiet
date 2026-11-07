@@ -7,7 +7,8 @@ export type QuickActionKind =
   | 'measurement'
   | 'plan'
   | 'consultation'
-  | 'consultation-complete';
+  | 'consultation-complete'
+  | 'task';
 
 export interface QuickAction {
   readonly kind: QuickActionKind;

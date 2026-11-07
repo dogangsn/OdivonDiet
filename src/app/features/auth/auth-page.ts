@@ -1,7 +1,7 @@
 import { Component, inject, signal } from '@angular/core';
 import { email, FormField, form, minLength, required, submit } from '@angular/forms/signals';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { AuthStore } from '../../core/auth/auth-store';
+import { AuthStore, PortalAccessError } from '../../core/auth/auth-store';
 import { PRODUCT } from '../../domain/product-manifest';
 import { VersionBadge } from '../../shared/ui/version-badge';
 
@@ -114,6 +114,12 @@ import { VersionBadge } from '../../shared/ui/version-badge';
             </span>
             <strong class="text-lg font-extrabold">{{ product.name }}</strong>
           </div>
+          @if (isMember) {
+            <span class="odv-badge odv-tone-positive mb-3"
+              ><span class="material-symbols-rounded !text-sm" aria-hidden="true">favorite</span
+              >Danışan portalı</span
+            >
+          }
           <h2 class="text-2xl font-extrabold tracking-tight">
             {{ isRegister ? 'Hesabınızı oluşturun' : 'Tekrar hoş geldiniz' }}
           </h2>
@@ -121,7 +127,9 @@ import { VersionBadge } from '../../shared/ui/version-badge';
             {{
               isRegister
                 ? 'Muayenehanenizi birkaç dakikada dijitale taşıyın.'
-                : 'Danışan panelinize giriş yapın.'
+                : isMember
+                  ? 'Planınızı, ölçümlerinizi ve diyetisyeninizle mesajlarınızı görün.'
+                  : 'Danışan panelinize giriş yapın.'
             }}
           </p>
 
@@ -205,16 +213,39 @@ import { VersionBadge } from '../../shared/ui/version-badge';
             ></span>
           </div>
           <button type="button" class="odv-btn-secondary !min-h-11 w-full" (click)="demo()">
-            <span class="material-symbols-rounded !text-lg">play_circle</span>Demo verilerle incele
+            <span class="material-symbols-rounded !text-lg">play_circle</span
+            >{{ isMember ? 'Demo danışan olarak incele' : 'Demo verilerle incele' }}
           </button>
-          <p class="mt-6 text-center text-sm text-slate-500">
-            {{ isRegister ? 'Zaten hesabınız var mı?' : 'Henüz hesabınız yok mu?' }}
-            <a
-              class="font-bold text-violet-600 hover:underline dark:text-violet-400"
-              [routerLink]="isRegister ? '/login' : '/register'"
-              >{{ isRegister ? 'Giriş yapın' : 'Hesap oluşturun' }}</a
-            >
-          </p>
+          @if (isMember) {
+            <p class="mt-6 text-center text-sm text-slate-500">
+              Portal hesabınızı diyetisyeniniz açar; davet e-postasındaki adresle giriş yapın.
+            </p>
+            <p class="mt-3 text-center text-sm text-slate-500">
+              Diyetisyen misiniz?
+              <a
+                class="font-bold text-violet-600 hover:underline dark:text-violet-400"
+                routerLink="/login"
+                >Diyetisyen girişi</a
+              >
+            </p>
+          } @else {
+            <p class="mt-6 text-center text-sm text-slate-500">
+              {{ isRegister ? 'Zaten hesabınız var mı?' : 'Henüz hesabınız yok mu?' }}
+              <a
+                class="font-bold text-violet-600 hover:underline dark:text-violet-400"
+                [routerLink]="isRegister ? '/login' : '/register'"
+                >{{ isRegister ? 'Giriş yapın' : 'Hesap oluşturun' }}</a
+              >
+            </p>
+            <p class="mt-3 text-center text-sm text-slate-500">
+              Danışan mısınız?
+              <a
+                class="font-bold text-emerald-700 hover:underline dark:text-emerald-400"
+                routerLink="/portal/login"
+                >Danışan portalına giriş</a
+              >
+            </p>
+          }
           <p class="mt-8 text-center text-[11px] leading-5 text-slate-400">
             Devam ederek kullanım koşullarını ve aydınlatma metnini kabul etmiş olursunuz.
           </p>
@@ -226,7 +257,12 @@ import { VersionBadge } from '../../shared/ui/version-badge';
 })
 export class AuthPage {
   readonly product = PRODUCT;
-  readonly isRegister = inject(ActivatedRoute).snapshot.data['mode'] === 'register';
+  private readonly mode = inject(ActivatedRoute).snapshot.data['mode'] as
+    | 'login'
+    | 'register'
+    | 'member';
+  readonly isRegister = this.mode === 'register';
+  readonly isMember = this.mode === 'member';
   readonly showPassword = signal(false);
   readonly busy = signal(false);
   readonly error = signal('');
@@ -249,17 +285,23 @@ export class AuthPage {
         const value = this.model();
         if (this.isRegister)
           await this.auth.register(value.name, value.email, value.password, value.company.trim());
+        else if (this.isMember) await this.auth.signInMember(value.email, value.password);
         else await this.auth.signIn(value.email, value.password);
-        await this.router.navigateByUrl('/overview');
-      } catch {
-        this.error.set('İşlem tamamlanamadı. Bilgilerinizi kontrol edip tekrar deneyin.');
+        await this.router.navigateByUrl(this.auth.homePath());
+      } catch (error) {
+        this.error.set(
+          error instanceof PortalAccessError
+            ? error.message
+            : 'İşlem tamamlanamadı. Bilgilerinizi kontrol edip tekrar deneyin.',
+        );
       } finally {
         this.busy.set(false);
       }
     });
   }
-  demo(): void {
-    this.auth.continueDemo();
-    void this.router.navigateByUrl('/overview');
+  async demo(): Promise<void> {
+    if (this.isMember) await this.auth.continueMemberDemo();
+    else this.auth.continueDemo();
+    await this.router.navigateByUrl(this.auth.homePath());
   }
 }

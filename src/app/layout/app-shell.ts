@@ -2,6 +2,7 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { AuthStore } from '../core/auth/auth-store';
 import { DietStore } from '../core/data/diet-store';
+import { PortalStore } from '../core/data/portal-store';
 import { I18nStore, SupportedLang } from '../core/i18n/i18n';
 import { ThemeStore } from '../core/theme/theme-store';
 import { PRODUCT_NAVIGATION } from '../domain/domain-navigation';
@@ -211,6 +212,7 @@ export class AppShell {
   readonly theme = inject(ThemeStore);
   readonly qa = inject(QuickActions);
   private readonly store = inject(DietStore);
+  private readonly portal = inject(PortalStore);
   private readonly router = inject(Router);
   readonly mobileOpen = signal(false);
 
@@ -218,6 +220,9 @@ export class AppShell {
     '/clients': this.store.activeClients().length,
     '/consultations': this.store.todaysConsultations().filter((c) => c.status === 'scheduled')
       .length,
+    '/messages': this.portal.dietitianUnread(),
+    '/requests': this.portal.openRequestCount(),
+    '/tasks': this.portal.overdueTaskCount(),
   }));
 
   constructor() {

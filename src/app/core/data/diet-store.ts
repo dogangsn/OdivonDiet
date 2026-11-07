@@ -8,6 +8,7 @@ import {
   daysBetween,
   goalProgress,
   isSameDay,
+  isoDate,
   round1,
   tdee,
 } from '../../domain/diet-calc';
@@ -217,7 +218,7 @@ export class DietStore {
     this.log(
       'monitor_weight',
       'info',
-      'Yeni ölçüm kaydedildi',
+      measurement.source === 'member' ? 'Danışan ölçüm girdi' : 'Yeni ölçüm kaydedildi',
       `${this.clientName(measurement.clientId)} · ${measurement.weightKg} kg`,
     );
   }
@@ -255,6 +256,15 @@ export class DietStore {
     this.log('restaurant_menu', 'neutral', 'Plan durumu değişti', `${plan.title} · ${status}`);
   }
 
+  /** The client gave KVKK explicit consent (from the member portal). */
+  recordConsent(clientId: string): void {
+    const today = isoDate(new Date());
+    this.clients.update((list) =>
+      list.map((c) => (c.id === clientId && !c.consentAt ? { ...c, consentAt: today } : c)),
+    );
+    this.log('verified_user', 'positive', 'KVKK açık rızası verildi', this.clientName(clientId));
+  }
+
   addConsultation(consultation: Omit<Consultation, 'id'>): void {
     this.consultations.update((list) => [...list, { ...consultation, id: newId('v') }]);
     this.log('event', 'info', 'Görüşme planlandı', this.clientName(consultation.clientId));
@@ -283,7 +293,8 @@ export class DietStore {
     this.log('event_busy', 'warning', 'Görüşme iptal edildi', this.clientName(item.clientId));
   }
 
-  private log(icon: string, tone: Tone, title: string, detail: string): void {
+  /** Adds an entry to the activity feed. Also used by `PortalStore`. */
+  log(icon: string, tone: Tone, title: string, detail: string): void {
     this.activity.update((list) => [
       { id: newId('a'), at: new Date().toISOString(), icon, tone, title, detail },
       ...list,
