@@ -4,10 +4,11 @@ import { AuthStore } from '../core/auth/auth-store';
 import { I18nStore, SupportedLang } from '../core/i18n/i18n';
 import { PRODUCT_NAVIGATION } from '../domain/domain-navigation';
 import { PRODUCT } from '../domain/product-manifest';
+import { VersionBadge } from '../shared/ui/version-badge';
 
 @Component({
   selector: 'app-shell',
-  imports: [RouterLink, RouterLinkActive, RouterOutlet],
+  imports: [RouterLink, RouterLinkActive, RouterOutlet, VersionBadge],
   template: `
     <div class="min-h-screen bg-slate-50 text-slate-900 dark:bg-[#0b1120] dark:text-slate-100">
       <a
@@ -85,6 +86,7 @@ import { PRODUCT } from '../domain/product-manifest';
           <button type="button" class="odv-btn-ghost w-full justify-start" (click)="logout()">
             <span class="material-symbols-rounded">logout</span>Güvenli çıkış
           </button>
+          <div class="mt-2 text-center"><odv-version-badge /></div>
         </div>
       </aside>
       <div class="lg:ms-72">
