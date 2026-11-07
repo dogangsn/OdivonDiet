@@ -4,10 +4,11 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthStore } from '../../core/auth/auth-store';
 import { TranslatePipe } from '../../core/i18n/i18n';
 import { PRODUCT } from '../../domain/product-manifest';
+import { VersionBadge } from '../../shared/ui/version-badge';
 
 @Component({
   selector: 'app-auth-page',
-  imports: [FormField, RouterLink, TranslatePipe],
+  imports: [FormField, RouterLink, TranslatePipe, VersionBadge],
   template: `
     <main class="min-h-screen bg-slate-950 text-white lg:grid lg:grid-cols-[1.08fr_.92fr]">
       <section
@@ -165,6 +166,7 @@ import { PRODUCT } from '../../domain/product-manifest';
           <p class="mt-8 text-center text-[11px] leading-5 text-slate-400">
             Devam ederek kullanım koşullarını ve gizlilik bildirimini kabul etmiş olursunuz.
           </p>
+          <p class="mt-3 text-center"><odv-version-badge /></p>
         </div>
       </section>
     </main>
