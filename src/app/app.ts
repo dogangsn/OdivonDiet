@@ -1,5 +1,6 @@
 import { Component, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
+import { ThemeStore } from './core/theme/theme-store';
 import { VersionStore } from './core/version/version-store';
 
 @Component({
@@ -28,6 +29,8 @@ import { VersionStore } from './core/version/version-store';
 })
 export class App {
   readonly version = inject(VersionStore);
+  // Applies the saved or system theme before any page renders, including the login screen.
+  private readonly theme = inject(ThemeStore);
   constructor() {
     this.version.start();
   }

@@ -5,6 +5,7 @@ export interface AppSession {
   readonly name: string;
   readonly email: string;
   readonly demo: boolean;
+  readonly practice?: string;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -22,16 +23,21 @@ export class AuthStore {
     const user = await this.identity.signIn(email, password);
     this.persist({ name: user.displayName || email.split('@')[0], email, demo: false });
   }
-  async register(name: string, email: string, password: string): Promise<void> {
+  async register(name: string, email: string, password: string, practice = ''): Promise<void> {
     if (!this.identity.configured) {
-      this.persist({ name, email, demo: true });
+      this.persist({ name, email, demo: true, practice });
       return;
     }
     const user = await this.identity.register(name, email, password);
-    this.persist({ name: user.displayName || name, email, demo: false });
+    this.persist({ name: user.displayName || name, email, demo: false, practice });
   }
   continueDemo(): void {
-    this.persist({ name: 'Demo Yöneticisi', email: 'demo@odivon.com', demo: true });
+    this.persist({
+      name: 'Dyt. Deniz Arslan',
+      email: 'demo@odivon.com',
+      demo: true,
+      practice: 'Odivon Demo Kliniği',
+    });
   }
   logout(): void {
     void this.identity.logout();
