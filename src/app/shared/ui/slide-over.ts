@@ -9,7 +9,7 @@ import { TranslatePipe } from '../../core/i18n/i18n';
   template: `
     @if (open()) {
       <div
-        class="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm"
+        class="fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-[2px]"
         (click)="requestClose()"
       ></div>
       <section
@@ -19,72 +19,62 @@ import { TranslatePipe } from '../../core/i18n/i18n';
         [attr.aria-label]="title()"
         tabindex="-1"
         (keydown.tab)="trapFocus($event)"
-        class="fixed inset-y-0 end-0 z-50 flex w-full flex-col overflow-hidden border-s border-slate-200 bg-white shadow-[0_0_80px_rgba(15,23,42,.28)] outline-none dark:border-slate-800 dark:bg-slate-900"
-        [class.max-w-3xl]="wide()"
-        [class.max-w-lg]="!wide()"
+        class="animate-slide-in fixed inset-y-0 end-0 z-50 flex w-full flex-col overflow-hidden border-s border-slate-200 bg-white shadow-2xl outline-none dark:border-slate-800 dark:bg-slate-900 sm:m-2 sm:rounded-2xl sm:border"
+        [class.sm:max-w-3xl]="wide()"
+        [class.sm:max-w-xl]="!wide()"
       >
-        <div class="h-1 bg-gradient-to-r from-violet-500 via-indigo-500 to-cyan-400"></div>
         <header
-          class="border-b border-slate-200 bg-gradient-to-b from-violet-50/80 to-white px-6 py-5 dark:border-slate-800 dark:from-violet-950/30 dark:to-slate-900 sm:px-8"
+          class="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4 dark:border-slate-800 sm:px-6"
         >
-          <div class="flex items-start justify-between gap-4">
-            <div class="flex min-w-0 items-start gap-3">
-              <span
-                class="grid size-11 shrink-0 place-items-center rounded-2xl bg-violet-600 text-white shadow-lg shadow-violet-500/25"
-              >
-                <span class="material-symbols-rounded">{{ icon() }}</span>
-              </span>
-              <div class="min-w-0">
-                <div
-                  class="mb-1 text-[10px] font-extrabold uppercase tracking-[.18em] text-violet-600 dark:text-violet-300"
-                >
+          <div class="flex min-w-0 items-start gap-3">
+            <span
+              class="grid size-10 shrink-0 place-items-center rounded-xl bg-violet-50 text-violet-600 dark:bg-violet-950/60 dark:text-violet-300"
+            >
+              <span class="material-symbols-rounded" aria-hidden="true">{{ icon() }}</span>
+            </span>
+            <div class="min-w-0">
+              @if (eyebrow()) {
+                <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">
                   {{ eyebrow() }}
                 </div>
-                <h2 class="m-0 text-xl font-black tracking-tight text-slate-950 dark:text-white">
-                  {{ title() }}
-                </h2>
-                @if (description()) {
-                  <p
-                    class="mb-0 mt-1 max-w-xl text-xs leading-5 text-slate-500 dark:text-slate-400"
-                  >
-                    {{ description() }}
-                  </p>
-                }
-              </div>
+              }
+              <h2
+                class="truncate text-lg font-extrabold tracking-tight text-slate-900 dark:text-white"
+              >
+                {{ title() }}
+              </h2>
+              @if (description()) {
+                <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{{ description() }}</p>
+              }
             </div>
-            <button
-              type="button"
-              (click)="requestClose()"
-              class="odv-icon-btn shrink-0"
-              aria-label="Kapat"
-            >
-              <span class="material-symbols-rounded">close</span>
-            </button>
           </div>
-        </header>
-        <form class="flex min-h-0 flex-1 flex-col" (submit)="submit($event)">
-          <div
-            class="custom-scroll flex-1 space-y-6 overflow-y-auto overscroll-contain bg-slate-50/60 p-5 dark:bg-slate-950/30 sm:p-8"
+          <button
+            type="button"
+            (click)="requestClose()"
+            class="odv-icon-btn shrink-0"
+            aria-label="Kapat"
           >
+            <span class="material-symbols-rounded">close</span>
+          </button>
+        </header>
+        <form class="flex min-h-0 flex-1 flex-col" (submit)="submit($event)" novalidate>
+          <div class="custom-scroll flex-1 space-y-5 overflow-y-auto overscroll-contain p-5 sm:p-6">
             <ng-content />
           </div>
           <footer
-            class="flex items-center justify-between gap-3 border-t border-slate-200 bg-white px-5 py-4 dark:border-slate-800 dark:bg-slate-900 sm:px-8"
+            class="flex flex-wrap items-center gap-2 border-t border-slate-100 bg-slate-50/70 px-5 py-3.5 dark:border-slate-800 dark:bg-slate-900/60 sm:px-6"
           >
-            <span
-              class="hidden items-center gap-1.5 text-[11px] font-semibold text-slate-400 sm:inline-flex"
-            >
-              <span class="material-symbols-rounded !text-base">lock</span>Değişiklikler güvenli
-              bağlantıyla kaydedilir
-            </span>
-            <div class="ms-auto flex items-center gap-3">
+            <ng-content select="[footer]" />
+            <div class="ms-auto flex items-center gap-2">
               <button type="button" class="odv-btn-ghost" (click)="requestClose()">
-                {{ 'common.cancel' | t }}
+                {{ showSubmit() ? ('common.cancel' | t) : 'Kapat' }}
               </button>
-              <button type="submit" class="odv-btn-primary" [disabled]="submitting()">
-                <span class="material-symbols-rounded">check</span
-                >{{ submitting() ? 'Kaydediliyor…' : submitLabel() }}
-              </button>
+              @if (showSubmit()) {
+                <button type="submit" class="odv-btn-primary" [disabled]="submitting()">
+                  <span class="material-symbols-rounded">check</span
+                  >{{ submitting() ? 'Kaydediliyor…' : submitLabel() }}
+                </button>
+              }
             </div>
           </footer>
         </form>
@@ -96,12 +86,13 @@ export class SlideOver {
   readonly open = input(false);
   readonly title = input.required<string>();
   readonly description = input('');
-  readonly eyebrow = input('Kayıt Yönetimi');
+  readonly eyebrow = input('');
   readonly icon = input('edit_note');
   readonly dirty = input(false);
   readonly wide = input(false);
   readonly submitting = input(false);
   readonly submitLabel = input('Kaydet');
+  readonly showSubmit = input(true);
   readonly closed = output<void>();
   readonly submitted = output<void>();
   private readonly panel = viewChild<ElementRef<HTMLElement>>('panel');
@@ -117,6 +108,7 @@ export class SlideOver {
   }
 
   async requestClose(): Promise<void> {
+    if (!this.open()) return;
     if (this.dirty()) {
       const result = await Swal.fire({
         title: 'Kaydedilmemiş değişiklikler',
