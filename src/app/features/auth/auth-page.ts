@@ -24,28 +24,76 @@ import { VersionBadge } from '../../shared/ui/version-badge';
 
         <div class="relative flex items-center gap-3">
           <span
-            class="mb-5 inline-flex rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-bold"
-            >Klinik Beslenme & Danışan Yönetimi</span
+            class="grid size-10 place-items-center rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 shadow-lg shadow-violet-500/30"
           >
-          <h1 class="m-0 text-5xl font-black leading-tight">
-            Kişiye özel beslenmeyi<br />ölçülebilir başarıya dönüştürün.
+            <span class="material-symbols-rounded icon-fill">nutrition</span>
+          </span>
+          <strong class="text-lg font-extrabold tracking-tight">{{ product.name }}</strong>
+        </div>
+
+        <div class="relative max-w-xl">
+          <h1 class="text-[2.75rem] font-extrabold leading-[1.1] tracking-tight">
+            Danışanlarınızın ilerlemesini<br />
+            <span
+              class="bg-gradient-to-r from-violet-300 to-emerald-300 bg-clip-text text-transparent"
+              >tek ekranda</span
+            >
+            yönetin.
           </h1>
           <p class="mt-5 text-base leading-7 text-slate-300">
             Danışan profili, beslenme planı, ölçüm ve takip görüşmeleri tek akışta. BKİ, bazal
             metabolizma ve günlük enerji ihtiyacı otomatik hesaplanır.
           </p>
-          <div class="mt-10 grid grid-cols-3 gap-3">
-            <div class="rounded-2xl bg-white/10 p-4">
-              <strong class="block text-2xl">AI</strong>
-              <span class="text-xs text-indigo-200">NutriPilot motoru</span>
+
+          <div class="mt-10 rounded-2xl border border-white/10 bg-white/[.06] p-5 backdrop-blur">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <span
+                  class="grid size-9 place-items-center rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 text-xs font-bold"
+                  >EK</span
+                >
+                <div>
+                  <strong class="block text-sm">Elif K.</strong>
+                  <span class="text-xs text-slate-400">Kilo verme · 12. hafta</span>
+                </div>
+              </div>
+              <span
+                class="rounded-full bg-emerald-400/15 px-2.5 py-1 text-xs font-bold text-emerald-300"
+                >−7,4 kg</span
+              >
             </div>
-            <div class="rounded-2xl bg-white/10 p-4">
-              <strong class="block text-2xl">8</strong>
-              <span class="text-xs text-indigo-200">Dil & RTL desteği</span>
-            </div>
-            <div class="rounded-2xl bg-white/10 p-4">
-              <strong class="block text-2xl">%100</strong>
-              <span class="text-xs text-indigo-200">KVKK uyumlu</span>
+            <svg viewBox="0 0 300 70" class="mt-4 h-16 w-full" aria-hidden="true">
+              <defs>
+                <linearGradient id="hero-fill" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0%" stop-color="#a78bfa" stop-opacity=".35" />
+                  <stop offset="100%" stop-color="#a78bfa" stop-opacity="0" />
+                </linearGradient>
+              </defs>
+              <path
+                d="M0,12 L50,18 L100,26 L150,33 L200,38 L250,48 L300,54 L300,70 L0,70 Z"
+                fill="url(#hero-fill)"
+              />
+              <path
+                d="M0,12 L50,18 L100,26 L150,33 L200,38 L250,48 L300,54"
+                fill="none"
+                stroke="#a78bfa"
+                stroke-width="2.5"
+                stroke-linecap="round"
+              />
+              <line x1="0" x2="300" y1="62" y2="62" stroke="#34d399" stroke-dasharray="4 4" />
+            </svg>
+            <div class="mt-3 grid grid-cols-3 gap-3 text-center text-xs">
+              <div class="rounded-xl bg-white/5 py-2">
+                <strong class="block text-base">24,9</strong><span class="text-slate-400">BKİ</span>
+              </div>
+              <div class="rounded-xl bg-white/5 py-2">
+                <strong class="block text-base">1650</strong
+                ><span class="text-slate-400">kcal / gün</span>
+              </div>
+              <div class="rounded-xl bg-white/5 py-2">
+                <strong class="block text-base">%61</strong
+                ><span class="text-slate-400">hedefe</span>
+              </div>
             </div>
           </div>
         </div>
@@ -66,22 +114,26 @@ import { VersionBadge } from '../../shared/ui/version-badge';
             </span>
             <strong class="text-lg font-extrabold">{{ product.name }}</strong>
           </div>
-          <div class="mb-8">
-            <span class="text-xs font-extrabold uppercase tracking-[.18em] text-violet-600">{{
-              isRegister ? 'Yeni çalışma alanı' : 'Tekrar hoş geldiniz'
-            }}</span>
-            <h2 class="mb-2 mt-3 text-3xl font-black">
-              {{ isRegister ? 'Hesabınızı oluşturun' : 'Hesabınıza giriş yapın' }}
-            </h2>
-            <p class="m-0 text-sm text-slate-500">
-              {{
-                isRegister
-                  ? 'Diyetisyen çalışma alanınızı birkaç adımda başlatın.'
-                  : 'Klinik çalışma alanınıza güvenli erişim sağlayın.'
-              }}
-            </p>
-          </div>
-          <form class="space-y-4" (submit)="onSubmit($event)">
+          @if (isMember) {
+            <span class="odv-badge odv-tone-positive mb-3"
+              ><span class="material-symbols-rounded !text-sm" aria-hidden="true">favorite</span
+              >Danışan portalı</span
+            >
+          }
+          <h2 class="text-2xl font-extrabold tracking-tight">
+            {{ isRegister ? 'Hesabınızı oluşturun' : 'Tekrar hoş geldiniz' }}
+          </h2>
+          <p class="mt-1.5 text-sm text-slate-500">
+            {{
+              isRegister
+                ? 'Muayenehanenizi birkaç dakikada dijitale taşıyın.'
+                : isMember
+                  ? 'Planınızı, ölçümlerinizi ve diyetisyeninizle mesajlarınızı görün.'
+                  : 'Danışan panelinize giriş yapın.'
+            }}
+          </p>
+
+          <form class="mt-8 space-y-4" (submit)="onSubmit($event)" novalidate>
             @if (isRegister) {
               <label class="block">
                 <span class="odv-label">Ad soyad</span>
@@ -92,14 +144,14 @@ import { VersionBadge } from '../../shared/ui/version-badge';
                   placeholder="Dyt. Ad Soyad"
                 />
                 @if (authForm.name().touched() && authForm.name().invalid()) {
-                  <span class="mt-1 block text-xs text-rose-600">Ad soyad zorunludur.</span>
-                }</label
-              ><label class="block"
-                ><span class="mb-1.5 block text-xs font-bold">Klinik / Merkez adı</span
-                ><input
+                  <span class="odv-error">Ad soyad zorunludur.</span>
+                }
+              </label>
+              <label class="block">
+                <span class="odv-label">Muayenehane / klinik adı</span>
+                <input
                   class="odv-input"
                   [formField]="authForm.company"
-                  placeholder="Örn. Diyet & Beslenme Kliniği"
                   autocomplete="organization"
                   placeholder="İsteğe bağlı"
                 />
