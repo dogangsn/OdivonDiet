@@ -1,5 +1,7 @@
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, provideRouter } from '@angular/router';
 import { PRODUCT_NAVIGATION } from '../../domain/domain-navigation';
 import { WorkspacePage } from './workspace-page';
 
@@ -8,6 +10,9 @@ describe('WorkspacePage', () => {
     await TestBed.configureTestingModule({
       imports: [WorkspacePage],
       providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([]),
         {
           provide: ActivatedRoute,
           useValue: {
@@ -57,5 +62,20 @@ describe('WorkspacePage', () => {
     await fixture.whenStable();
     expect(component.rows().length).toBe(initialCount + 1);
     expect(component.rows()[0].name).toBe('Yeni doğrulama kaydı');
+  });
+
+  it('renders AI NutriPilot section properly', async () => {
+    const aiRoute = {
+      snapshot: {
+        data: { view: 'domain', section: 'ai-nutripilot' },
+      },
+    };
+    const fixture = TestBed.createComponent(WorkspacePage);
+    (fixture.componentInstance as unknown as { route: typeof aiRoute }).route = aiRoute;
+    Object.defineProperty(fixture.componentInstance, 'section', { value: 'ai-nutripilot' });
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const element = fixture.nativeElement as HTMLElement;
+    expect(element.querySelector('app-ai-copilot-panel')).toBeTruthy();
   });
 });

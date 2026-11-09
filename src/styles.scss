@@ -21,3 +21,35 @@ button { cursor: pointer; border: 0; }
 .odv-swal-confirm { border-radius: .75rem !important; background: #6d28d9 !important; }
 .odv-swal-danger { border-radius: .75rem !important; background: #dc2626 !important; }
 .odv-swal-cancel { border-radius: .75rem !important; background: #e2e8f0 !important; color: #334155 !important; }
+
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #0f172a !important;
+  }
+  aside,
+  header,
+  nav,
+  .no-print,
+  .odv-icon-btn,
+  button,
+  .no-print * {
+    display: none !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+  .odv-card {
+    box-shadow: none !important;
+    border: 1px solid #e2e8f0 !important;
+    break-inside: avoid;
+    background: #ffffff !important;
+    color: #0f172a !important;
+  }
+  .print-clean {
+    position: static !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+}

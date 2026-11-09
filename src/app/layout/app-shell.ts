@@ -103,13 +103,21 @@ import { PRODUCT } from '../domain/product-manifest';
             <div>
               <strong class="block text-sm">{{ product.name }}</strong
               ><span class="hidden text-[11px] text-slate-500 sm:block"
-                >Uyumluluk operasyon merkezi</span
+                >Klinik Beslenme & Danışan Yönetimi</span
               >
             </div>
           </div>
           <div class="flex items-center gap-2">
-            <label class="sr-only" for="language">Dil</label
-            ><select
+            <a
+              routerLink="/client-portal"
+              class="hidden sm:inline-flex items-center gap-1.5 rounded-xl border border-violet-200 bg-violet-50/80 px-2.5 py-1.5 text-xs font-bold text-violet-700 hover:bg-violet-100 transition-colors dark:border-violet-900/60 dark:bg-violet-950/40 dark:text-violet-300"
+              title="Danışan Portalı & Mobil Önizleme"
+            >
+              <span class="material-symbols-rounded !text-sm">smartphone</span>
+              Danışan Portalı
+            </a>
+            <label class="sr-only" for="language">Dil</label>
+            <select
               id="language"
               class="odv-input !w-auto !py-2"
               [value]="i18n.currentLang()"
