@@ -4,6 +4,7 @@ import { DietStore } from '../../core/data/diet-store';
 import { isoDate, round1 } from '../../domain/diet-calc';
 import { SlideOver } from '../../shared/ui/slide-over';
 import { QuickActions } from './quick-actions';
+import { Notify } from '../../core/notify/notify';
 
 interface MeasurementDraft {
   clientId: string;
@@ -103,6 +104,7 @@ interface MeasurementDraft {
 export class MeasurementForm {
   readonly qa = inject(QuickActions);
   readonly store = inject(DietStore);
+  private readonly notify = inject(Notify);
   readonly open = computed(() => this.qa.state()?.kind === 'measurement');
   readonly model = signal<MeasurementDraft>(this.empty());
   readonly f = form(this.model, (p) => {
@@ -148,6 +150,7 @@ export class MeasurementForm {
         bodyFatPct: v.bodyFatPct,
         note: v.note.trim(),
       });
+      this.notify.success('Ölçüm kaydedildi', `${this.store.clientName(v.clientId)} · ${v.weightKg} kg`);
       this.qa.close();
     });
   }

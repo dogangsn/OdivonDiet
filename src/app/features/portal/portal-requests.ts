@@ -15,6 +15,7 @@ import { EmptyState } from '../../shared/ui/empty-state';
 import { FilePicker, PickedFiles } from '../../shared/ui/file-picker';
 import { PageHeader } from '../../shared/ui/page-header';
 import { toneClass } from '../../shared/ui/tone';
+import { Notify } from '../../core/notify/notify';
 
 interface RequestDraft {
   type: RequestType;
@@ -116,6 +117,7 @@ export class PortalRequests {
   readonly id = input<string>();
   readonly new = input<string>();
   readonly member = inject(MemberPortal);
+  private readonly notify = inject(Notify);
   readonly typeIcons = REQUEST_TYPE_ICONS;
   readonly typeLabels = REQUEST_TYPE_LABELS;
   readonly statusLabels = REQUEST_STATUS_LABELS;
@@ -169,6 +171,7 @@ export class PortalRequests {
     void submit(this.f, async () => {
       const v = this.model();
       this.member.createRequest(v.type, v.subject, v.detail, this.files());
+      this.notify.success('Talebiniz iletildi', 'Diyetisyeniniz en kısa sürede yanıtlayacak.');
       this.formOpen.set(false);
       this.files.set([]);
     });

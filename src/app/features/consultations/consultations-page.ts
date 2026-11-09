@@ -1,6 +1,5 @@
 import { DatePipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
-import Swal from 'sweetalert2';
 import { DietStore } from '../../core/data/diet-store';
 import { isoDate, startOfDay } from '../../domain/diet-calc';
 import { CHANNEL_ICONS, CHANNEL_LABELS, Consultation } from '../../domain/diet.models';
@@ -8,6 +7,7 @@ import { Avatar } from '../../shared/ui/avatar';
 import { EmptyState } from '../../shared/ui/empty-state';
 import { PageHeader } from '../../shared/ui/page-header';
 import { QuickActions } from '../forms/quick-actions';
+import { Notify } from '../../core/notify/notify';
 
 @Component({
   selector: 'app-consultations-page',
@@ -153,6 +153,7 @@ import { QuickActions } from '../forms/quick-actions';
 export class ConsultationsPage {
   readonly store = inject(DietStore);
   readonly qa = inject(QuickActions);
+  private readonly notify = inject(Notify);
   readonly labels = CHANNEL_LABELS;
   readonly icons = CHANNEL_ICONS;
   readonly tab = signal<'upcoming' | 'past'>('upcoming');
@@ -197,19 +198,14 @@ export class ConsultationsPage {
   });
 
   async cancel(item: Consultation): Promise<void> {
-    const result = await Swal.fire({
+    const confirmed = await this.notify.confirm({
       title: 'Görüşme iptal edilsin mi?',
       text: `${this.store.clientName(item.clientId)} ile planlanan görüşme iptal edilecek.`,
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonText: 'İptal et',
-      cancelButtonText: 'Vazgeç',
-      customClass: {
-        popup: 'odv-swal-popup',
-        confirmButton: 'odv-swal-danger',
-        cancelButton: 'odv-swal-cancel',
-      },
+      confirmText: 'İptal et',
+      tone: 'danger',
     });
-    if (result.isConfirmed) this.store.cancelConsultation(item.id);
+    if (!confirmed) return;
+    this.store.cancelConsultation(item.id);
+    this.notify.success('Görüşme iptal edildi');
   }
 }

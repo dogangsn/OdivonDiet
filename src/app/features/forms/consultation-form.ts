@@ -5,6 +5,7 @@ import { isoDate } from '../../domain/diet-calc';
 import { CHANNEL_ICONS, CHANNEL_LABELS, ConsultationChannel } from '../../domain/diet.models';
 import { SlideOver } from '../../shared/ui/slide-over';
 import { QuickActions } from './quick-actions';
+import { Notify } from '../../core/notify/notify';
 
 interface ScheduleDraft {
   clientId: string;
@@ -157,6 +158,7 @@ const CHANNELS = Object.keys(CHANNEL_LABELS) as ConsultationChannel[];
 export class ConsultationForm {
   readonly qa = inject(QuickActions);
   readonly store = inject(DietStore);
+  private readonly notify = inject(Notify);
   readonly channels = CHANNELS;
   readonly labels = CHANNEL_LABELS;
   readonly icons = CHANNEL_ICONS;
@@ -225,6 +227,7 @@ export class ConsultationForm {
         notes: v.notes.trim(),
         nextAction: '',
       });
+      this.notify.success('Görüşme planlandı', `${this.store.clientName(v.clientId)} · ${v.date} ${v.time}`);
       this.qa.close();
     });
   }
@@ -235,6 +238,7 @@ export class ConsultationForm {
     void submit(this.cf, async () => {
       const v = this.complete();
       this.store.completeConsultation(id, v.adherence, v.notes.trim(), v.nextAction.trim());
+      this.notify.success('Görüşme tamamlandı');
       this.qa.close();
     });
   }

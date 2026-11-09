@@ -6,6 +6,7 @@ import { Meal } from '../../domain/diet.models';
 import { MacroBar } from '../../shared/ui/macro-bar';
 import { SlideOver } from '../../shared/ui/slide-over';
 import { QuickActions } from './quick-actions';
+import { Notify } from '../../core/notify/notify';
 
 interface PlanDraft {
   clientId: string;
@@ -217,6 +218,7 @@ const MEAL_LAYOUTS: Record<number, ReadonlyArray<[string, string, number]>> = {
 export class PlanForm {
   readonly qa = inject(QuickActions);
   readonly store = inject(DietStore);
+  private readonly notify = inject(Notify);
   readonly open = computed(() => this.qa.state()?.kind === 'plan');
   readonly model = signal<PlanDraft>(this.empty());
   readonly f = form(this.model, (p) => {
@@ -307,6 +309,7 @@ export class PlanForm {
         status: v.activate ? 'active' : 'draft',
         notes: v.notes.trim(),
       });
+      this.notify.success(v.activate ? 'Plan kaydedildi ve aktifleştirildi' : 'Plan taslak olarak kaydedildi', v.title.trim());
       this.qa.close();
     });
   }

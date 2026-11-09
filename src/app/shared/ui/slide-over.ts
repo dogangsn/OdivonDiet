@@ -1,6 +1,6 @@
-import { Component, ElementRef, effect, input, output, viewChild } from '@angular/core';
-import Swal from 'sweetalert2';
+import { Component, ElementRef, effect, inject, input, output, viewChild } from '@angular/core';
 import { TranslatePipe } from '../../core/i18n/i18n';
+import { Notify } from '../../core/notify/notify';
 
 @Component({
   selector: 'app-slide-over',
@@ -83,6 +83,7 @@ import { TranslatePipe } from '../../core/i18n/i18n';
   `,
 })
 export class SlideOver {
+  private readonly notify = inject(Notify);
   readonly open = input(false);
   readonly title = input.required<string>();
   readonly description = input('');
@@ -110,20 +111,13 @@ export class SlideOver {
   async requestClose(): Promise<void> {
     if (!this.open()) return;
     if (this.dirty()) {
-      const result = await Swal.fire({
+      const confirmed = await this.notify.confirm({
         title: 'Kaydedilmemiş değişiklikler',
         text: 'Yaptığınız değişiklikler kaybolacak. Çıkılsın mı?',
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonText: 'Çık',
-        cancelButtonText: 'Vazgeç',
-        customClass: {
-          popup: 'odv-swal-popup',
-          confirmButton: 'odv-swal-danger',
-          cancelButton: 'odv-swal-cancel',
-        },
+        confirmText: 'Çık',
+        tone: 'danger',
       });
-      if (!result.isConfirmed) return;
+      if (!confirmed) return;
     }
     this.closed.emit();
     queueMicrotask(() => this.opener?.focus());

@@ -1,6 +1,5 @@
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { Component, computed, inject } from '@angular/core';
-import Swal from 'sweetalert2';
 import { Router } from '@angular/router';
 import { DietStore } from '../../core/data/diet-store';
 import { PortalStore } from '../../core/data/portal-store';
@@ -20,6 +19,7 @@ import { SlideOver } from '../../shared/ui/slide-over';
 import { toneClass } from '../../shared/ui/tone';
 import { TrendChart } from '../../shared/ui/trend-chart';
 import { QuickActions } from './quick-actions';
+import { Notify } from '../../core/notify/notify';
 
 @Component({
   selector: 'app-client-detail',
@@ -294,6 +294,7 @@ export class ClientDetail {
   readonly qa = inject(QuickActions);
   private readonly store = inject(DietStore);
   private readonly portal = inject(PortalStore);
+  private readonly notify = inject(Notify);
   private readonly router = inject(Router);
   readonly accessLabels = PORTAL_ACCESS_LABELS;
   readonly programLabels = PROGRAM_LABELS;
@@ -358,60 +359,44 @@ export class ClientDetail {
   async invite(): Promise<void> {
     const v = this.view();
     if (!v) return;
-    const result = await Swal.fire({
+    const confirmed = await this.notify.confirm({
       title: 'Portala davet edilsin mi?',
       text: `${v.client.email} adresine giriş bağlantısı gönderilir. Danışan planını, ölçümlerini ve görevlerini görür, size mesaj yazabilir.`,
-      icon: 'question',
-      showCancelButton: true,
-      confirmButtonText: 'Davet gönder',
-      cancelButtonText: 'Vazgeç',
-      customClass: {
-        popup: 'odv-swal-popup',
-        confirmButton: 'odv-swal-confirm',
-        cancelButton: 'odv-swal-cancel',
-      },
+      confirmText: 'Davet gönder',
+      tone: 'primary',
     });
-    if (result.isConfirmed) this.portal.invite(v.client.id);
+    if (!confirmed) return;
+    this.portal.invite(v.client.id);
+    this.notify.success('Davet gönderildi', `${v.client.email} adresine giriş bağlantısı iletildi.`);
   }
 
   async disablePortal(): Promise<void> {
     const v = this.view();
     if (!v) return;
-    const result = await Swal.fire({
+    const confirmed = await this.notify.confirm({
       title: 'Portal erişimi kapatılsın mı?',
       text: `${v.fullName} portala giriş yapamaz. Mesaj geçmişi saklanır.`,
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonText: 'Erişimi kapat',
-      cancelButtonText: 'Vazgeç',
-      customClass: {
-        popup: 'odv-swal-popup',
-        confirmButton: 'odv-swal-danger',
-        cancelButton: 'odv-swal-cancel',
-      },
+      confirmText: 'Erişimi kapat',
+      tone: 'danger',
     });
-    if (result.isConfirmed) this.portal.disable(v.client.id);
+    if (!confirmed) return;
+    this.portal.disable(v.client.id);
+    this.notify.info('Portal erişimi kapatıldı', `${v.fullName} artık portala giriş yapamaz.`);
   }
 
   async changeStatus(status: ClientStatus): Promise<void> {
     const v = this.view();
     if (!v) return;
     if (status === 'archived') {
-      const result = await Swal.fire({
+      const confirmed = await this.notify.confirm({
         title: 'Danışan arşivlensin mi?',
         text: `${v.fullName} aktif listeden kaldırılır. Arşivden istediğiniz zaman geri alabilirsiniz.`,
-        icon: 'question',
-        showCancelButton: true,
-        confirmButtonText: 'Arşivle',
-        cancelButtonText: 'Vazgeç',
-        customClass: {
-          popup: 'odv-swal-popup',
-          confirmButton: 'odv-swal-danger',
-          cancelButton: 'odv-swal-cancel',
-        },
+        confirmText: 'Arşivle',
+        tone: 'danger',
       });
-      if (!result.isConfirmed) return;
+      if (!confirmed) return;
     }
     this.store.setClientStatus(v.client.id, status);
+    this.notify.success(status === 'archived' ? 'Danışan arşivlendi' : 'Danışan durumu güncellendi');
   }
 }

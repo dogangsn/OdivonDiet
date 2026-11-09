@@ -11,6 +11,7 @@ import {
 } from '../../domain/portal.models';
 import { SlideOver } from '../../shared/ui/slide-over';
 import { QuickActions } from './quick-actions';
+import { Notify } from '../../core/notify/notify';
 
 interface TaskDraft {
   clientId: string;
@@ -113,6 +114,7 @@ export class TaskForm {
   readonly qa = inject(QuickActions);
   readonly store = inject(DietStore);
   private readonly portal = inject(PortalStore);
+  private readonly notify = inject(Notify);
   private readonly auth = inject(AuthStore);
   readonly open = computed(() => this.qa.state()?.kind === 'task');
   readonly templates = TEMPLATES;
@@ -158,6 +160,7 @@ export class TaskForm {
         },
         this.auth.session()?.name ?? 'Diyetisyen',
       );
+      this.notify.success('Görev atandı', v.title);
       this.qa.close();
     });
   }

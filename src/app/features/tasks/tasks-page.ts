@@ -1,7 +1,6 @@
 import { DatePipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import Swal from 'sweetalert2';
 import { DietStore } from '../../core/data/diet-store';
 import { PortalStore } from '../../core/data/portal-store';
 import { isoDate } from '../../domain/diet-calc';
@@ -11,6 +10,7 @@ import { Avatar } from '../../shared/ui/avatar';
 import { EmptyState } from '../../shared/ui/empty-state';
 import { PageHeader } from '../../shared/ui/page-header';
 import { QuickActions } from '../forms/quick-actions';
+import { Notify } from '../../core/notify/notify';
 
 type Filter = 'open' | 'overdue' | 'done';
 
@@ -107,6 +107,7 @@ export class TasksPage {
   readonly diet = inject(DietStore);
   readonly portal = inject(PortalStore);
   readonly qa = inject(QuickActions);
+  private readonly notify = inject(Notify);
   readonly icons = TASK_CATEGORY_ICONS;
   readonly labels = TASK_CATEGORY_LABELS;
   readonly filter = signal<Filter>('open');
@@ -140,15 +141,14 @@ export class TasksPage {
   }
 
   async remove(t: CareTask): Promise<void> {
-    const result = await Swal.fire({
+    const confirmed = await this.notify.confirm({
       title: 'Görev silinsin mi?',
       text: `“${t.title}” danışanın portalından da kaldırılır.`,
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonText: 'Sil',
-      cancelButtonText: 'Vazgeç',
-      customClass: { popup: 'odv-swal-popup', confirmButton: 'odv-swal-danger', cancelButton: 'odv-swal-cancel' },
+      confirmText: 'Sil',
+      tone: 'danger',
     });
-    if (result.isConfirmed) this.portal.deleteTask(t.id);
+    if (!confirmed) return;
+    this.portal.deleteTask(t.id);
+    this.notify.success('Görev silindi');
   }
 }

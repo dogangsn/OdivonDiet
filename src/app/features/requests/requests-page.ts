@@ -17,6 +17,7 @@ import { EmptyState } from '../../shared/ui/empty-state';
 import { PageHeader } from '../../shared/ui/page-header';
 import { SlideOver } from '../../shared/ui/slide-over';
 import { toneClass } from '../../shared/ui/tone';
+import { Notify } from '../../core/notify/notify';
 
 type Filter = 'active' | 'closed' | 'all';
 
@@ -157,6 +158,7 @@ export class RequestsPage {
   readonly diet = inject(DietStore);
   private readonly portal = inject(PortalStore);
   private readonly auth = inject(AuthStore);
+  private readonly notify = inject(Notify);
   private readonly router = inject(Router);
   readonly typeIcons = REQUEST_TYPE_ICONS;
   readonly typeLabels = REQUEST_TYPE_LABELS;
@@ -207,6 +209,7 @@ export class RequestsPage {
     const r = this.selected();
     if (!r) return;
     this.portal.respondToRequest(r.id, this.status(), this.response(), this.auth.session()?.name ?? 'Diyetisyen');
+    this.notify.success('Yanıt gönderildi', 'Danışan portalda bilgilendirildi.');
     this.openRequest(null);
   }
 }

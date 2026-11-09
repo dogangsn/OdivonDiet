@@ -12,6 +12,7 @@ import {
 import { SlideOver } from '../../shared/ui/slide-over';
 import { toneClass } from '../../shared/ui/tone';
 import { QuickActions } from './quick-actions';
+import { Notify } from '../../core/notify/notify';
 
 interface ClientDraft {
   firstName: string;
@@ -249,6 +250,7 @@ const EMPTY: ClientDraft = {
 export class ClientForm {
   readonly qa = inject(QuickActions);
   private readonly store = inject(DietStore);
+  private readonly notify = inject(Notify);
   readonly open = computed(() => {
     const kind = this.qa.state()?.kind;
     return kind === 'client-new' || kind === 'client-edit';
@@ -330,6 +332,7 @@ export class ClientForm {
         consentAt: v.consent ? (existing?.consentAt ?? isoDate(new Date())) : null,
         status: existing?.status ?? 'active',
       });
+      this.notify.success(existing ? 'Değişiklikler kaydedildi' : 'Danışan eklendi', `${saved.firstName} ${saved.lastName}`);
       this.qa.open('client-detail', saved.id);
     });
   }
