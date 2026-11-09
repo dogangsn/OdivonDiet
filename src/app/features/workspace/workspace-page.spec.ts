@@ -2,7 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, provideRouter } from '@angular/router';
-import { PRODUCT_NAVIGATION } from '../../domain/domain-navigation';
+import { WORKSPACE_DOMAINS } from '../../domain/domain-navigation';
 import { WorkspacePage } from './workspace-page';
 
 describe('WorkspacePage', () => {
@@ -17,7 +17,7 @@ describe('WorkspacePage', () => {
           provide: ActivatedRoute,
           useValue: {
             snapshot: {
-              data: { view: 'domain', section: PRODUCT_NAVIGATION[0].key },
+              data: { view: 'domain', section: WORKSPACE_DOMAINS[0].key },
             },
           },
         },
@@ -30,7 +30,7 @@ describe('WorkspacePage', () => {
     fixture.componentInstance.openCreate();
     await fixture.whenStable();
     const element = fixture.nativeElement as HTMLElement;
-    expect(element.textContent).toContain(PRODUCT_NAVIGATION[0].title);
+    expect(element.textContent).toContain(WORKSPACE_DOMAINS[0].title);
     expect(element.textContent).toContain('Teknik ve mevzuat bilgileri');
   });
 

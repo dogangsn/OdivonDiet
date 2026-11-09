@@ -5,7 +5,7 @@ import { environment } from '../../../environments/environment';
 import { DietApiService } from '../../core/api/diet-api.service';
 import { TranslatePipe } from '../../core/i18n/i18n';
 import { DietStateService } from '../../core/services/diet-state.service';
-import { PRODUCT_NAVIGATION } from '../../domain/domain-navigation';
+import { WORKSPACE_DOMAINS } from '../../domain/domain-navigation';
 import { PRODUCT } from '../../domain/product-manifest';
 import { PageHeader } from '../../shared/ui/page-header';
 import { SlideOver } from '../../shared/ui/slide-over';
@@ -834,7 +834,6 @@ interface ProgressReportCard {
             [eyebrow]="product.name"
             [title]="domain.title"
             [description]="domain.description"
-            [icon]="domain.icon"
           >
             <div actions class="flex items-center gap-2">
               <a routerLink="/client-portal" class="odv-btn-soft">
@@ -1483,10 +1482,10 @@ export class WorkspacePage implements OnInit {
     | 'settings';
   readonly section = this.route.snapshot.data['section'] as string;
   readonly domain =
-    PRODUCT_NAVIGATION.find((item) => item.key === this.section) ?? PRODUCT_NAVIGATION[0];
+    WORKSPACE_DOMAINS.find((item) => item.key === this.section) ?? WORKSPACE_DOMAINS[0];
   readonly domainIndex = Math.max(
     0,
-    PRODUCT_NAVIGATION.findIndex((item) => item.key === this.section),
+    WORKSPACE_DOMAINS.findIndex((item) => item.key === this.section),
   );
   readonly apiBaseUrl = environment.apiBaseUrl;
   readonly search = signal('');
