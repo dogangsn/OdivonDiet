@@ -25,10 +25,40 @@ export const PRODUCT_NAVIGATION: readonly NavigationGroup[] = [
     ],
   },
   {
+    key: 'measurements',
+    path: 'measurements',
+    icon: 'monitor_weight',
+    label: 'Ölçümler & Laboratuvar',
+    title: 'Vücut Ölçümleri & Biyobelirteçler',
+    description: 'Kilo, çevre, kompozisyon ve kan tahlili verilerini takip edin.',
+    label: 'Danışan portalı',
+    items: [
+      { path: '/messages', icon: 'forum', label: 'Mesajlar' },
+      { path: '/requests', icon: 'inbox', label: 'Talepler' },
+      { path: '/tasks', icon: 'task_alt', label: 'Görevler' },
+    ],
+  },
+  {
     label: 'Sistem',
     items: [
       { path: '/activity', icon: 'history', label: 'Aktiviteler' },
       { path: '/settings', icon: 'settings', label: 'Ayarlar' },
     ],
+  },
+  {
+    key: 'ai-nutripilot',
+    path: 'ai-nutripilot',
+    icon: 'auto_awesome',
+    label: 'AI NutriPilot',
+    title: 'Yapay Zekâ Klinik Diyet Asistanı',
+    description: 'Akıllı menü üreticisi, biyobelirteç tahlil analizi ve kaçamak telafi karar desteği.',
+  },
+  {
+    key: 'client-portal',
+    path: 'client-portal',
+    icon: 'smartphone',
+    label: 'Danışan Portalı',
+    title: 'Danışan Portalı & Mobil Diyet Günlüğü',
+    description: 'Danışanların günlük öğün, su tüketimi, kaçamak telafisi ve kilo takibi yaptığı etkileşimli danışan arayüzü.',
   },
 ];

@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { authGuard } from './core/auth/auth.guard';
+import { roleGuard } from './core/auth/auth.guard';
 
 export const routes: Routes = [
   {
@@ -13,8 +13,19 @@ export const routes: Routes = [
     data: { mode: 'register' },
   },
   {
+    path: 'portal/login',
+    title: 'Danışan girişi · OdivonDiet',
+    loadComponent: () => import('./features/auth/auth-page').then((m) => m.AuthPage),
+    data: { mode: 'member' },
+  },
+  {
+    path: 'portal',
+    canActivate: [roleGuard('member')],
+    loadChildren: () => import('./features/portal/portal.routes').then((m) => m.PORTAL_ROUTES),
+  },
+  {
     path: '',
-    canActivate: [authGuard],
+    canActivate: [roleGuard('dietitian')],
     loadComponent: () => import('./layout/app-shell').then((m) => m.AppShell),
     children: [
       {
@@ -49,6 +60,23 @@ export const routes: Routes = [
         path: 'reports',
         title: 'Raporlar · OdivonDiet',
         loadComponent: () => import('./features/reports/reports-page').then((m) => m.ReportsPage),
+      },
+      {
+        path: 'messages',
+        title: 'Mesajlar · OdivonDiet',
+        loadComponent: () =>
+          import('./features/messages/messages-page').then((m) => m.MessagesPage),
+      },
+      {
+        path: 'requests',
+        title: 'Talepler · OdivonDiet',
+        loadComponent: () =>
+          import('./features/requests/requests-page').then((m) => m.RequestsPage),
+      },
+      {
+        path: 'tasks',
+        title: 'Görevler · OdivonDiet',
+        loadComponent: () => import('./features/tasks/tasks-page').then((m) => m.TasksPage),
       },
       {
         path: 'activity',

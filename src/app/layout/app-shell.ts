@@ -2,6 +2,7 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { AuthStore } from '../core/auth/auth-store';
 import { DietStore } from '../core/data/diet-store';
+import { PortalStore } from '../core/data/portal-store';
 import { I18nStore, SupportedLang } from '../core/i18n/i18n';
 import { ThemeStore } from '../core/theme/theme-store';
 import { PRODUCT_NAVIGATION } from '../domain/domain-navigation';
@@ -9,10 +10,11 @@ import { PRODUCT } from '../domain/product-manifest';
 import { QuickActionHost } from '../features/forms/quick-action-host';
 import { QuickActions } from '../features/forms/quick-actions';
 import { Avatar } from '../shared/ui/avatar';
+import { VersionBadge } from '../shared/ui/version-badge';
 
 @Component({
   selector: 'app-shell',
-  imports: [RouterLink, RouterLinkActive, RouterOutlet, Avatar, QuickActionHost],
+  imports: [RouterLink, RouterLinkActive, RouterOutlet, Avatar, QuickActionHost, VersionBadge],
   template: `
     <div class="min-h-screen text-slate-900 dark:text-slate-100">
       <a
@@ -126,6 +128,7 @@ import { Avatar } from '../shared/ui/avatar';
               <span class="material-symbols-rounded !text-lg">logout</span>
             </button>
           </div>
+          <div class="mt-1 text-center"><odv-version-badge /></div>
         </div>
       </aside>
 
@@ -169,6 +172,22 @@ import { Avatar } from '../shared/ui/avatar';
               <span class="material-symbols-rounded !text-lg">add</span
               ><span class="hidden sm:inline">Danışan</span>
             </button>
+            <div>
+              <strong class="block text-sm">{{ product.name }}</strong
+              ><span class="hidden text-[11px] text-slate-500 sm:block"
+                >Klinik Beslenme & Danışan Yönetimi</span
+              >
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <a
+              routerLink="/client-portal"
+              class="hidden sm:inline-flex items-center gap-1.5 rounded-xl border border-violet-200 bg-violet-50/80 px-2.5 py-1.5 text-xs font-bold text-violet-700 hover:bg-violet-100 transition-colors dark:border-violet-900/60 dark:bg-violet-950/40 dark:text-violet-300"
+              title="Danışan Portalı & Mobil Önizleme"
+            >
+              <span class="material-symbols-rounded !text-sm">smartphone</span>
+              Danışan Portalı
+            </a>
             <label class="sr-only" for="language">Dil</label>
             <select
               id="language"
@@ -209,6 +228,7 @@ export class AppShell {
   readonly theme = inject(ThemeStore);
   readonly qa = inject(QuickActions);
   private readonly store = inject(DietStore);
+  private readonly portal = inject(PortalStore);
   private readonly router = inject(Router);
   readonly mobileOpen = signal(false);
 
@@ -216,6 +236,9 @@ export class AppShell {
     '/clients': this.store.activeClients().length,
     '/consultations': this.store.todaysConsultations().filter((c) => c.status === 'scheduled')
       .length,
+    '/messages': this.portal.dietitianUnread(),
+    '/requests': this.portal.openRequestCount(),
+    '/tasks': this.portal.overdueTaskCount(),
   }));
 
   constructor() {

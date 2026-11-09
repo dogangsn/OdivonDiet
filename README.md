@@ -22,7 +22,21 @@ BKİ, bazal metabolizma (Mifflin‑St Jeor) ve günlük enerji ihtiyacı `src/ap
 - `src/app/features/forms` – her yerden açılabilen ortak çekmeceler (`QuickActions` servisi ile).
 - `src/app/shared/ui` – KPI kartı, avatar, trend grafiği, makro çubuğu gibi ortak bileşenler.
 
-## Yerel geliştirme
+## Temel Yetkinlikler
+
+- **Danışan Portföyü & Anamnez**: Danışan sağlık öyküsü, alerjenler, klinik tanılar ve biyometrik veriler.
+- **Kişiselleştirilmiş Beslenme Planları**: BMR/TDEE bazlı enerji, makro/mikro dağılımı ve esnek öğün değişim listeleri.
+- **Vücut Kompozisyonu & Biyobelirteçler**: Kilo, yağ/kas analizi, antropometrik ölçümler ve kan tahlili takibi.
+- **Takip Görüşmeleri & Danışan İletişimi**: Seans notları, haftalık uyum puanlaması ve motivasyon protokolleri.
+- **AI NutriPilot (Yapay Zekâ Klinik Karar Desteği)**:
+  - Otomatik klinik menü ve beslenme reçetesi üretimi (Glutensiz, Laktozsuz, Düşük FODMAP, İnsülin Direnci vb.).
+  - Laboratuvar biyobelirteç analizi ve besin-ilaç/besin-besin etkileşim uyarıları.
+  - Akıllı kaçamak telafi simülatörü (48 saatlik toparlanma protokolü).
+  - Görüşme notlarından otomatik SOAP klinik kaydı ve WhatsApp/SMS motivasyon mesajı derleyicisi.
+- **8 Dil & Tam RTL Desteği**: Türkçe, İngilizce, Almanca, Fransızca, İspanyolca, İtalyanca, Hollandaca ve tam uyumlu Arapça (RTL).
+- **Erişilebilirlik (A11y)**: WCAG AA standartlarına ve Axe-core sıfır kritik bulgu kuralına tam uyumluluk.
+
+## Yerel Geliştirme
 
 ```bash
 npm install
@@ -31,7 +45,7 @@ npm start
 
 MainAPI adresi ve Firebase web istemci ayarları `src/environments/environment.ts` içinde yerel/deployment ortamına göre sağlanır. Bu repoya service-account veya production credential eklenmez.
 
-## Doğrulama
+## Doğrulama ve Testler
 
 ```bash
 npm run typecheck
@@ -44,3 +58,10 @@ npm run build
 ## Lisans
 
 Bu projeye açık kaynak lisansı verilmemiştir. Tüm hakları saklıdır.
+
+## Sürüm bilgisi ve güncelleme
+
+- Her `npm start` / `npm run build` öncesinde `scripts/write-version.mjs` çalışır; `package.json` sürümü, commit hash'i ve derleme zamanı `build-info.ts` ile `public/version.json` dosyalarına yazılır. Sürüm (`v1.0.0 · a1b2c3d`) menünün altında ve giriş sayfasında görünür.
+- Yeni bir derleme yayınlandığında açık sekmeler `version.json` dosyasını 5 dakikada bir (ve sekmeye dönüldüğünde) kontrol eder ve güncelleme penceresi gösterir.
+- Yeni sürüme geçişte oturum, çerezler, sessionStorage ve önbellekler temizlenir (tema/dil tercihleri korunur) ve kullanıcı `/login` sayfasına yönlendirilir.
+- Büyük değişikliklerde `package.json` içindeki `version` alanını artırın (`npm version minor`).

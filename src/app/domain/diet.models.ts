@@ -35,6 +35,8 @@ export interface Measurement {
   readonly hipCm: number | null;
   readonly bodyFatPct: number | null;
   readonly note: string;
+  /** Who entered it. Missing means the dietitian (records from before the member portal). */
+  readonly source?: 'dietitian' | 'member';
 }
 
 export interface Meal {

@@ -48,6 +48,22 @@ export class FirebaseIdentity {
     return this.auth?.currentUser?.getIdToken() ?? null;
   }
 
+  /**
+   * Role claims set by MainAPI on the Firebase user (`role`, `clientId`).
+   * Members only ever receive their own `clientId`, so the portal cannot read other clients.
+   */
+  async claims(): Promise<{ role?: string; clientId?: string }> {
+    await this.initialize();
+    const user = this.auth?.currentUser;
+    if (!user) return {};
+    const result = await user.getIdTokenResult();
+    return {
+      role: typeof result.claims['role'] === 'string' ? result.claims['role'] : undefined,
+      clientId:
+        typeof result.claims['clientId'] === 'string' ? result.claims['clientId'] : undefined,
+    };
+  }
+
   async requestHeaders(): Promise<Record<string, string>> {
     const headers: Record<string, string> = {};
     const token = await this.idToken();

@@ -32,6 +32,9 @@
             "styles": [
               "src/tailwind.css",
               "src/styles.scss"
+            ],
+            "allowedCommonJsDependencies": [
+              "sweetalert2"
             ]
           },
           "configurations": {
