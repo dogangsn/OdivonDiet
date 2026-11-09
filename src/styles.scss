@@ -1,7 +1,4 @@
-@use '@angular/material' as mat;
-
 :root {
-  @include mat.theme((color: (primary: mat.$violet-palette, tertiary: mat.$blue-palette), typography: "Plus Jakarta Sans", density: 0));
   color-scheme: light;
   font-family: "Plus Jakarta Sans", sans-serif;
 }
@@ -9,13 +6,25 @@
 :root.dark { color-scheme: dark; }
 * { box-sizing: border-box; }
 html, body { min-height: 100%; margin: 0; }
-body { background: radial-gradient(circle at 82% -10%, rgb(124 58 237 / .09), transparent 28rem), #f8fafc; color: #0f172a; }
-.dark body { background: radial-gradient(circle at 82% -10%, rgb(124 58 237 / .16), transparent 30rem), #0b1120; color: #f8fafc; }
-button, input, select { font: inherit; }
-button { cursor: pointer; border: 0; }
-.material-symbols-rounded { font-size: 20px; line-height: 1; }
-.custom-scroll { scrollbar-width: thin; scrollbar-color: #94a3b8 transparent; }
+body { background: #f8fafc; color: #0f172a; -webkit-font-smoothing: antialiased; }
+.dark body { background: #0b1120; color: #f8fafc; }
+/* Unlayered rules beat Tailwind's layered utilities, so keep element resets out of here. */
+button { cursor: pointer; }
+.material-symbols-rounded { font-size: 20px; line-height: 1; font-variation-settings: "FILL" 0, "wght" 400; }
+.icon-fill { font-variation-settings: "FILL" 1, "wght" 400; }
+.custom-scroll { scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
+.dark .custom-scroll { scrollbar-color: #334155 transparent; }
 .rtl .directional-icon { transform: scaleX(-1); }
+.tabular { font-variant-numeric: tabular-nums; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+
+@media print {
+  .no-print { display: none !important; }
+  body { background: white !important; }
+}
 
 .odv-swal-popup { border-radius: 1rem !important; font-family: "Plus Jakarta Sans", sans-serif !important; }
 .odv-swal-confirm { border-radius: .75rem !important; background: #6d28d9 !important; }

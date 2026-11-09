@@ -1,6 +1,5 @@
 import { Routes } from '@angular/router';
-import { authGuard } from './core/auth/auth.guard';
-import { PRODUCT_NAVIGATION } from './domain/domain-navigation';
+import { roleGuard } from './core/auth/auth.guard';
 
 export const routes: Routes = [
   {
@@ -14,33 +13,82 @@ export const routes: Routes = [
     data: { mode: 'register' },
   },
   {
+    path: 'portal/login',
+    title: 'Danışan girişi · OdivonDiet',
+    loadComponent: () => import('./features/auth/auth-page').then((m) => m.AuthPage),
+    data: { mode: 'member' },
+  },
+  {
+    path: 'portal',
+    canActivate: [roleGuard('member')],
+    loadChildren: () => import('./features/portal/portal.routes').then((m) => m.PORTAL_ROUTES),
+  },
+  {
     path: '',
-    canActivate: [authGuard],
+    canActivate: [roleGuard('dietitian')],
     loadComponent: () => import('./layout/app-shell').then((m) => m.AppShell),
     children: [
       {
         path: 'overview',
+        title: 'Genel bakış · OdivonDiet',
         loadComponent: () =>
-          import('./features/workspace/workspace-page').then((m) => m.WorkspacePage),
-        data: { view: 'overview' },
+          import('./features/overview/overview-page').then((m) => m.OverviewPage),
       },
-      ...PRODUCT_NAVIGATION.map((item) => ({
-        path: item.path,
+      {
+        path: 'clients',
+        title: 'Danışanlar · OdivonDiet',
+        loadComponent: () => import('./features/clients/clients-page').then((m) => m.ClientsPage),
+      },
+      {
+        path: 'plans',
+        title: 'Beslenme planları · OdivonDiet',
+        loadComponent: () => import('./features/plans/plans-page').then((m) => m.PlansPage),
+      },
+      {
+        path: 'measurements',
+        title: 'Ölçümler · OdivonDiet',
         loadComponent: () =>
-          import('./features/workspace/workspace-page').then((m) => m.WorkspacePage),
-        data: { view: 'domain', section: item.key },
-      })),
+          import('./features/measurements/measurements-page').then((m) => m.MeasurementsPage),
+      },
+      {
+        path: 'consultations',
+        title: 'Görüşmeler · OdivonDiet',
+        loadComponent: () =>
+          import('./features/consultations/consultations-page').then((m) => m.ConsultationsPage),
+      },
+      {
+        path: 'reports',
+        title: 'Raporlar · OdivonDiet',
+        loadComponent: () => import('./features/reports/reports-page').then((m) => m.ReportsPage),
+      },
+      {
+        path: 'messages',
+        title: 'Mesajlar · OdivonDiet',
+        loadComponent: () =>
+          import('./features/messages/messages-page').then((m) => m.MessagesPage),
+      },
+      {
+        path: 'requests',
+        title: 'Talepler · OdivonDiet',
+        loadComponent: () =>
+          import('./features/requests/requests-page').then((m) => m.RequestsPage),
+      },
+      {
+        path: 'tasks',
+        title: 'Görevler · OdivonDiet',
+        loadComponent: () => import('./features/tasks/tasks-page').then((m) => m.TasksPage),
+      },
       {
         path: 'activity',
+        title: 'Aktiviteler · OdivonDiet',
         loadComponent: () =>
-          import('./features/workspace/workspace-page').then((m) => m.WorkspacePage),
-        data: { view: 'activity' },
+          import('./features/activity/activity-page').then((m) => m.ActivityPage),
       },
       {
         path: 'settings',
+        title: 'Ayarlar · OdivonDiet',
         loadComponent: () =>
-          import('./features/workspace/workspace-page').then((m) => m.WorkspacePage),
-        data: { view: 'settings' },
+          import('./features/settings/settings-page').then((m) => m.SettingsPage),
       },
       { path: '', pathMatch: 'full', redirectTo: 'overview' },
     ],
