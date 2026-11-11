@@ -27,4 +27,22 @@ describe('PlanForm', () => {
     await fixture.whenStable();
     expect(store.plans().length).toBe(before + 1);
   });
+
+  it('calculates meal calories from foods, scales portions, and syncs target from menu', async () => {
+    const fixture = TestBed.createComponent(PlanForm);
+    TestBed.inject(QuickActions).open('plan', 'c-1');
+    await fixture.whenStable();
+    const form = fixture.componentInstance;
+
+    form.applyPreset('low-gi');
+    expect(form.menuSummary().itemCount).toBeGreaterThan(5);
+    const beforeKcal = form.menuSummary().kcal;
+
+    form.adjustPortion(0, 0, 1);
+    expect(form.menuSummary().kcal).toBeGreaterThan(beforeKcal);
+
+    form.syncTargetFromMenu();
+    expect(form.model().kcal).toBe(form.menuSummary().kcal);
+    expect(form.macroTotal()).toBe(100);
+  });
 });

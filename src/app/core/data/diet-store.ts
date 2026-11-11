@@ -17,6 +17,7 @@ import {
   Client,
   ClientStatus,
   Consultation,
+  FoodItem,
   MealPlan,
   Measurement,
   PlanStatus,
@@ -68,6 +69,7 @@ export class DietStore {
   readonly plans = signal<MealPlan[]>(this.seed.plans);
   readonly consultations = signal<Consultation[]>(this.seed.consultations);
   readonly activity = signal<ActivityEntry[]>(this.seed.activity);
+  readonly foods = signal<FoodItem[]>(this.seed.foods);
 
   readonly clientViews = computed<ClientView[]>(() => {
     const now = new Date();
@@ -291,6 +293,37 @@ export class DietStore {
       list.map((c) => (c.id === id ? { ...c, status: 'cancelled' } : c)),
     );
     this.log('event_busy', 'warning', 'Görüşme iptal edildi', this.clientName(item.clientId));
+  }
+
+  saveFood(food: Omit<FoodItem, 'id'> & { id?: string }): FoodItem {
+    const existing = food.id ? this.foods().find((f) => f.id === food.id) : undefined;
+    if (existing) {
+      const updated: FoodItem = { ...existing, ...food, id: existing.id };
+      this.foods.update((list) => list.map((f) => (f.id === existing.id ? updated : f)));
+      this.log(
+        'grocery',
+        'primary',
+        'Besin / yemek güncellendi',
+        `${updated.name} · ${updated.kcal} kcal`,
+      );
+      return updated;
+    }
+    const created: FoodItem = { ...food, id: newId('f'), isCustom: true };
+    this.foods.update((list) => [created, ...list]);
+    this.log(
+      'grocery',
+      'positive',
+      'Yeni besin / yemek eklendi',
+      `${created.name} · ${created.kcal} kcal (${created.unit})`,
+    );
+    return created;
+  }
+
+  deleteFood(foodId: string): void {
+    const item = this.foods().find((f) => f.id === foodId);
+    if (!item) return;
+    this.foods.update((list) => list.filter((f) => f.id !== foodId));
+    this.log('delete', 'warning', 'Besin kütüphaneden silindi', item.name);
   }
 
   /** Adds an entry to the activity feed. Also used by `PortalStore`. */

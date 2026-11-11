@@ -65,4 +65,31 @@ describe('DietStore', () => {
     expect(store.consultations().find((c) => c.id === 'v-1')!.status).toBe('done');
     expect(store.activity()[0].title).toBe('Görüşme tamamlandı');
   });
+
+  it('adds, updates, and deletes foods in the library', () => {
+    const before = store.foods().length;
+    const created = store.saveFood({
+      name: 'Zeytinyağlı kabak kalye',
+      brand: 'Klinik Tarif',
+      category: 'yemek',
+      exchange: 'sebze',
+      unit: '1 porsiyon',
+      grams: 200,
+      kcal: 145,
+      proteinG: 3.5,
+      carbG: 12,
+      fatG: 9.5,
+      fiberG: 4.2,
+      gi: 'low',
+      allergens: [],
+    });
+    expect(store.foods().length).toBe(before + 1);
+    expect(created.isCustom).toBe(true);
+
+    store.saveFood({ ...created, kcal: 160 });
+    expect(store.foods().find((f) => f.id === created.id)!.kcal).toBe(160);
+
+    store.deleteFood(created.id);
+    expect(store.foods().length).toBe(before);
+  });
 });

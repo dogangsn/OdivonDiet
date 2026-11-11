@@ -39,13 +39,31 @@ import { ProgressBar } from '../../shared/ui/progress-bar';
             <app-progress-bar [value]="timeline().pct" label="Plan süresinin geçen kısmı" />
           </div>
           <app-macro-bar class="mt-5 block" [kcal]="plan.kcal" [protein]="plan.proteinPct" [carb]="plan.carbPct" [fat]="plan.fatPct" [detailed]="true" />
-          <h3 class="odv-section-title mt-6 text-sm">Öğünler</h3>
-          <ol class="mt-3 grid gap-2 sm:grid-cols-2">
+          <h3 class="odv-section-title mt-6 text-sm">Günlük öğün programı ve porsiyonlar</h3>
+          <ol class="mt-3 grid gap-3 sm:grid-cols-2">
             @for (meal of plan.meals; track $index) {
-              <li class="flex items-center gap-3 rounded-xl bg-slate-50 px-4 py-3 dark:bg-slate-800/60">
-                <span class="tabular w-12 text-sm font-semibold text-slate-500">{{ meal.time }}</span>
-                <strong class="flex-1 text-sm">{{ meal.name }}</strong>
-                <span class="tabular text-xs text-slate-500">{{ meal.kcal }} kcal</span>
+              <li class="rounded-xl bg-slate-50 p-4 dark:bg-slate-800/60">
+                <div class="flex items-center gap-3">
+                  <span class="tabular w-12 text-sm font-semibold text-violet-600 dark:text-violet-300">{{ meal.time }}</span>
+                  <strong class="flex-1 text-sm">{{ meal.name }}</strong>
+                  <span class="tabular text-xs font-bold text-slate-600 dark:text-slate-300">{{ meal.kcal }} kcal</span>
+                </div>
+                @if (meal.items && meal.items.length) {
+                  <ul class="mt-2.5 space-y-1 border-t border-slate-200/70 pt-2 text-xs dark:border-slate-700/70">
+                    @for (item of meal.items; track $index) {
+                      <li class="flex items-start justify-between gap-2">
+                        <span>
+                          <strong class="font-medium">{{ item.name }}</strong>
+                          <span class="text-slate-500"> · {{ item.portions }} × {{ item.unit }} ({{ item.grams }}g)</span>
+                          @if (item.alternative) {
+                            <em class="block text-[11px] text-violet-600 dark:text-violet-300">Alternatif: {{ item.alternative }}</em>
+                          }
+                        </span>
+                        <span class="tabular text-slate-500">{{ item.kcal }} kcal</span>
+                      </li>
+                    }
+                  </ul>
+                }
               </li>
             }
           </ol>

@@ -7,6 +7,9 @@ export interface AppSession {
   readonly email: string;
   readonly demo: boolean;
   readonly practice?: string;
+  readonly specialty?: string;
+  readonly licenseNo?: string;
+  readonly workspaceMode?: string;
   /** Missing on sessions saved before the member portal existed; treated as `dietitian`. */
   readonly role?: UserRole;
   /** Only for members: the client record this login belongs to. */
@@ -111,20 +114,30 @@ export class AuthStore {
     });
   }
 
-  continueDemo(): void {
+  continueDemo(profile?: {
+    name: string;
+    email: string;
+    practice: string;
+    specialty?: string;
+    licenseNo?: string;
+    workspaceMode?: string;
+  }): void {
     this.persist({
-      name: 'Dyt. Deniz Arslan',
-      email: 'demo@odivon.com',
+      name: profile?.name ?? 'Uzm. Dyt. Deniz Arslan',
+      email: profile?.email ?? 'demo@odivon.com',
       demo: true,
-      practice: 'Odivon Demo Kliniği',
+      practice: profile?.practice ?? 'Odivon Klinik Beslenme Merkezi',
+      specialty: profile?.specialty ?? 'Obezite & Metabolik Beslenme',
+      licenseNo: profile?.licenseNo ?? 'TR-DYT-10482',
+      workspaceMode: profile?.workspaceMode ?? 'Klinik + Online Hibrit',
       role: 'dietitian',
     });
   }
 
-  /** Demo member login as the first client with portal access (Elif Kaya in the seed). */
-  async continueMemberDemo(): Promise<void> {
+  /** Demo member login as the selected client (defaults to the first client with portal access, Elif Kaya). */
+  async continueMemberDemo(preferredClientId?: string): Promise<void> {
     const { diet, portal } = await this.stores();
-    const clientId = portal.demoMemberId();
+    const clientId = preferredClientId ?? portal.demoMemberId();
     const client = diet.clients().find((c) => c.id === clientId);
     if (!client) return;
     portal.markActivated(clientId);

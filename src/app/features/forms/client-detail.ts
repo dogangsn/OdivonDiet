@@ -194,11 +194,20 @@ import { Notify } from '../../core/notify/notify';
             <ul class="mt-4 grid gap-2 sm:grid-cols-2">
               @for (meal of plan.meals; track $index) {
                 <li
-                  class="flex items-center gap-3 rounded-xl bg-slate-50 px-3 py-2 text-xs dark:bg-slate-800/60"
+                  class="rounded-xl bg-slate-50 px-3 py-2.5 text-xs dark:bg-slate-800/60"
                 >
-                  <span class="tabular font-semibold text-slate-400">{{ meal.time }}</span>
-                  <span class="font-bold">{{ meal.name }}</span>
-                  <span class="tabular ms-auto text-slate-500">{{ meal.kcal }} kcal</span>
+                  <div class="flex items-center gap-2">
+                    <span class="tabular font-semibold text-violet-600 dark:text-violet-300">{{ meal.time }}</span>
+                    <span class="font-bold">{{ meal.name }}</span>
+                    <span class="tabular ms-auto font-semibold text-slate-600 dark:text-slate-300">{{ meal.kcal }} kcal</span>
+                  </div>
+                  @if (meal.items && meal.items.length) {
+                    <p class="mt-1 text-[11px] text-slate-500">
+                      @for (it of meal.items; track $index; let last = $last) {
+                        {{ it.name }} ({{ it.grams }}g){{ last ? '' : ', ' }}
+                      }
+                    </p>
+                  }
                 </li>
               }
             </ul>

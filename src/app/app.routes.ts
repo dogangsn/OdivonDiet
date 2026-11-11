@@ -45,6 +45,11 @@ export const routes: Routes = [
         loadComponent: () => import('./features/plans/plans-page').then((m) => m.PlansPage),
       },
       {
+        path: 'foods',
+        title: 'Besin & yemek kütüphanesi · OdivonDiet',
+        loadComponent: () => import('./features/foods/foods-page').then((m) => m.FoodsPage),
+      },
+      {
         path: 'measurements',
         title: 'Ölçümler · OdivonDiet',
         loadComponent: () =>

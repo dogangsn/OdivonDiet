@@ -1,7 +1,22 @@
 import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { FormField, email, form, max, min, required, submit } from '@angular/forms/signals';
 import { DietStore } from '../../core/data/diet-store';
-import { ageFrom, bmi, bmiBand, bmr, isoDate, suggestedKcal, tdee } from '../../domain/diet-calc';
+import { Notify } from '../../core/notify/notify';
+import {
+  ageFrom,
+  bmi,
+  bmiBand,
+  bmr,
+  estimatedWeeksToGoal,
+  harrisBenedictBmr,
+  idealWeightRange,
+  isoDate,
+  suggestedKcal,
+  tdee,
+  waistHipRisk,
+  waterNeedLiters,
+} from '../../domain/diet-calc';
 import {
   ACTIVITY_LABELS,
   ActivityLevel,
@@ -12,7 +27,28 @@ import {
 import { SlideOver } from '../../shared/ui/slide-over';
 import { toneClass } from '../../shared/ui/tone';
 import { QuickActions } from './quick-actions';
-import { Notify } from '../../core/notify/notify';
+
+const COMMON_CONDITIONS = [
+  'İnsülin direnci',
+  'Tip 2 diyabet',
+  'Hipotiroidi',
+  'PCOS',
+  'Hipertansiyon',
+  'Dislipidemi',
+  'Reflü / Gastrit',
+  'Demir eksikliği',
+] as const;
+
+const COMMON_ALLERGIES = [
+  'Laktoz',
+  'Gluten',
+  'İnek sütü',
+  'Yumurta',
+  'Yer fıstığı',
+  'Kuruyemiş',
+  'Balık',
+  'Soya',
+] as const;
 
 interface ClientDraft {
   firstName: string;
@@ -24,10 +60,15 @@ interface ClientDraft {
   heightCm: number | null;
   startWeightKg: number | null;
   targetWeightKg: number | null;
+  waistCm: number | null;
+  hipCm: number | null;
+  bodyFatPct: number | null;
+  waterTargetL: number | null;
   activity: ActivityLevel;
   program: ProgramType;
   conditions: string;
   allergies: string;
+  clinicalNotes: string;
   consent: boolean;
 }
 
@@ -41,32 +82,37 @@ const EMPTY: ClientDraft = {
   heightCm: null,
   startWeightKg: null,
   targetWeightKg: null,
+  waistCm: null,
+  hipCm: null,
+  bodyFatPct: null,
+  waterTargetL: null,
   activity: 'light',
   program: 'weight_loss',
   conditions: '',
   allergies: '',
+  clinicalNotes: '',
   consent: false,
 };
 
 @Component({
   selector: 'app-client-form',
-  imports: [SlideOver, FormField],
+  imports: [SlideOver, FormField, FormsModule],
   template: `
     <app-slide-over
       [open]="open()"
       [wide]="true"
       [dirty]="dirty()"
       icon="person_add"
-      [eyebrow]="editing() ? 'Danışan profili' : 'Yeni danışan'"
-      [title]="editing() ? 'Profili düzenle' : 'Danışan ekle'"
-      description="Kişisel bilgiler, başlangıç ölçüleri ve sağlık öyküsü."
+      [eyebrow]="editing() ? 'Klinik danışan dosyası' : 'Yeni danışan kabul & anamnez'"
+      [title]="editing() ? 'Danışan klinik profilini düzenle' : 'Detaylı danışan kaydı & metabolik analiz'"
+      description="Demografik bilgiler, antropometrik çevre ölçümleri, Mifflin & Harris-Benedict bazal metabolizma hesabı ve klinik sağlık öyküsü."
       [submitLabel]="editing() ? 'Değişiklikleri kaydet' : 'Danışanı kaydet'"
       (closed)="qa.close()"
       (submitted)="save()"
     >
       <fieldset class="odv-card p-5">
         <legend class="sr-only">Kişisel bilgiler</legend>
-        <h3 class="odv-section-title mb-4 text-sm">Kişisel bilgiler</h3>
+        <h3 class="odv-section-title mb-4 text-sm">Kişisel ve iletişim bilgileri</h3>
         <div class="grid gap-4 sm:grid-cols-2">
           <label class="block">
             <span class="odv-label">Ad <b class="text-rose-500">*</b></span>
@@ -101,7 +147,7 @@ const EMPTY: ClientDraft = {
             }
           </label>
           <div>
-            <span class="odv-label" id="sex-label">Cinsiyet</span>
+            <span class="odv-label" id="sex-label">Biyolojik cinsiyet (BMR katsayısı için)</span>
             <div class="odv-segment w-full" role="group" aria-labelledby="sex-label">
               <button
                 type="button"
@@ -125,8 +171,10 @@ const EMPTY: ClientDraft = {
       </fieldset>
 
       <fieldset class="odv-card p-5">
-        <legend class="sr-only">Program ve ölçüler</legend>
-        <h3 class="odv-section-title mb-4 text-sm">Program ve ölçüler</h3>
+        <legend class="sr-only">Program, antropometri ve metabolik analiz</legend>
+        <h3 class="odv-section-title mb-4 text-sm">
+          Antropometrik ölçümler ve enerji metabolizması
+        </h3>
         <div class="grid gap-4 sm:grid-cols-3">
           <label class="block">
             <span class="odv-label">Boy (cm) <b class="text-rose-500">*</b></span>
@@ -159,8 +207,48 @@ const EMPTY: ClientDraft = {
               <span class="odv-error">30–300 kg arası.</span>
             }
           </label>
+
+          <label class="block">
+            <span class="odv-label">Bel çevresi (cm)</span>
+            <input
+              class="odv-input tabular"
+              type="number"
+              step="0.5"
+              placeholder="Örn. 84"
+              [ngModel]="model().waistCm"
+              [ngModelOptions]="{ standalone: true }"
+              (ngModelChange)="patchModel({ waistCm: $event ? +$event : null })"
+            />
+          </label>
+
+          <label class="block">
+            <span class="odv-label">Kalça çevresi (cm)</span>
+            <input
+              class="odv-input tabular"
+              type="number"
+              step="0.5"
+              placeholder="Örn. 102"
+              [ngModel]="model().hipCm"
+              [ngModelOptions]="{ standalone: true }"
+              (ngModelChange)="patchModel({ hipCm: $event ? +$event : null })"
+            />
+          </label>
+
+          <label class="block">
+            <span class="odv-label">Vücut yağ oranı (%)</span>
+            <input
+              class="odv-input tabular"
+              type="number"
+              step="0.1"
+              placeholder="Örn. 28.5"
+              [ngModel]="model().bodyFatPct"
+              [ngModelOptions]="{ standalone: true }"
+              (ngModelChange)="patchModel({ bodyFatPct: $event ? +$event : null })"
+            />
+          </label>
+
           <label class="block sm:col-span-1">
-            <span class="odv-label">Aktivite düzeyi</span>
+            <span class="odv-label">Fiziksel aktivite düzeyi (PAL)</span>
             <select class="odv-input" [formField]="f.activity">
               @for (option of activityOptions; track option[0]) {
                 <option [value]="option[0]">{{ option[1] }}</option>
@@ -168,7 +256,7 @@ const EMPTY: ClientDraft = {
             </select>
           </label>
           <label class="block sm:col-span-2">
-            <span class="odv-label">Program</span>
+            <span class="odv-label">Klinik beslenme programı</span>
             <select class="odv-input" [formField]="f.program">
               @for (option of programOptions; track option[0]) {
                 <option [value]="option[0]">{{ option[1] }}</option>
@@ -176,37 +264,60 @@ const EMPTY: ClientDraft = {
             </select>
           </label>
         </div>
+
         @if (preview(); as p) {
           <div
-            class="mt-5 grid grid-cols-2 gap-3 rounded-xl bg-slate-50 p-4 dark:bg-slate-800/50 sm:grid-cols-4"
+            class="mt-5 space-y-3 rounded-xl border border-violet-200 bg-violet-50/40 p-4 dark:border-violet-900/50 dark:bg-slate-800/60"
           >
-            <div>
-              <span class="odv-eyebrow">BKİ</span>
-              <div class="mt-1 flex items-center gap-2">
-                <strong class="tabular text-lg">{{ p.bmi }}</strong>
-                <span class="odv-badge" [class]="p.bandClass">{{ p.band }}</span>
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <strong class="text-xs font-bold uppercase tracking-wider text-violet-700 dark:text-violet-300">
+                Otomatik Klinik Metabolik & Antropometrik Analiz Raporu
+              </strong>
+              <span class="odv-badge" [class]="p.bandClass">BKİ {{ p.bmi }} · {{ p.band }}</span>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div class="rounded-lg bg-white p-2.5 dark:bg-slate-900">
+                <span class="odv-eyebrow">Bazal (Mifflin-St Jeor)</span>
+                <strong class="tabular mt-1 block text-base">
+                  {{ p.bmr }} <small class="text-xs text-slate-400">kcal</small>
+                </strong>
+                <span class="text-[11px] text-slate-500">Harris-Benedict: {{ p.hbBmr }} kcal</span>
               </div>
-            </div>
-            <div>
-              <span class="odv-eyebrow">Bazal (BMR)</span
-              ><strong class="tabular mt-1 block text-lg"
-                >{{ p.bmr }}
-                <small class="text-xs font-semibold text-slate-400">kcal</small></strong
-              >
-            </div>
-            <div>
-              <span class="odv-eyebrow">Günlük ihtiyaç</span
-              ><strong class="tabular mt-1 block text-lg"
-                >{{ p.tdee }}
-                <small class="text-xs font-semibold text-slate-400">kcal</small></strong
-              >
-            </div>
-            <div>
-              <span class="odv-eyebrow">Önerilen hedef</span
-              ><strong class="tabular mt-1 block text-lg text-violet-600 dark:text-violet-300"
-                >{{ p.suggested }}
-                <small class="text-xs font-semibold text-slate-400">kcal</small></strong
-              >
+
+              <div class="rounded-lg bg-white p-2.5 dark:bg-slate-900">
+                <span class="odv-eyebrow">Günlük İhtiyaç (TDEE)</span>
+                <strong class="tabular mt-1 block text-base">
+                  {{ p.tdee }} <small class="text-xs text-slate-400">kcal</small>
+                </strong>
+                <span class="text-[11px] text-violet-600 dark:text-violet-300">
+                  Önerilen diyet: {{ p.suggested }} kcal
+                </span>
+              </div>
+
+              <div class="rounded-lg bg-white p-2.5 dark:bg-slate-900">
+                <span class="odv-eyebrow">İdeal Kilo Aralığı</span>
+                <strong class="tabular mt-1 block text-base">
+                  {{ p.idealMin }} – {{ p.idealMax }} <small class="text-xs text-slate-400">kg</small>
+                </strong>
+                <span class="text-[11px] text-slate-500">
+                  Tahmini süre: ~{{ p.weeksToGoal }} hafta
+                </span>
+              </div>
+
+              <div class="rounded-lg bg-white p-2.5 dark:bg-slate-900">
+                <span class="odv-eyebrow">Su İhtiyacı & WHR</span>
+                <strong class="tabular mt-1 block text-base">
+                  {{ p.waterL }} <small class="text-xs text-slate-400">L / gün</small>
+                </strong>
+                @if (p.whr) {
+                  <span class="text-[11px] text-slate-500">
+                    Bel/Kalça: {{ p.whr.ratio }} ({{ p.whr.label }})
+                  </span>
+                } @else {
+                  <span class="text-[11px] text-slate-400">35 ml/kg hidrasyon</span>
+                }
+              </div>
             </div>
           </div>
         }
@@ -214,23 +325,64 @@ const EMPTY: ClientDraft = {
 
       <fieldset class="odv-card p-5">
         <legend class="sr-only">Sağlık öyküsü</legend>
-        <h3 class="odv-section-title mb-4 text-sm">Sağlık öyküsü</h3>
+        <h3 class="odv-section-title mb-4 text-sm">Klinik sağlık öyküsü, tanılar ve alerjenler</h3>
         <div class="grid gap-4 sm:grid-cols-2">
-          <label class="block">
-            <span class="odv-label">Hastalıklar / tanılar</span>
-            <input
-              class="odv-input"
-              [formField]="f.conditions"
-              placeholder="Örn. Tip 2 diyabet, hipotiroidi"
-            />
-            <span class="odv-hint">Virgülle ayırın.</span>
-          </label>
-          <label class="block">
-            <span class="odv-label">Alerji ve intoleranslar</span>
-            <input class="odv-input" [formField]="f.allergies" placeholder="Örn. laktoz, gluten" />
-            <span class="odv-hint">Virgülle ayırın.</span>
-          </label>
+          <div>
+            <label class="block">
+              <span class="odv-label">Hastalıklar / klinik tanılar</span>
+              <input
+                class="odv-input"
+                [formField]="f.conditions"
+                placeholder="Örn. Tip 2 diyabet, hipotiroidi"
+              />
+            </label>
+            <div class="mt-2 flex flex-wrap gap-1">
+              @for (cond of commonConditions; track cond) {
+                <button
+                  type="button"
+                  (click)="toggleConditionChip(cond)"
+                  class="rounded-full border border-slate-200 px-2.5 py-0.5 text-[11px] font-semibold text-slate-600 transition hover:border-violet-400 hover:text-violet-700 dark:border-slate-700 dark:text-slate-300"
+                >
+                  + {{ cond }}
+                </button>
+              }
+            </div>
+          </div>
+
+          <div>
+            <label class="block">
+              <span class="odv-label">Besin alerjileri ve intoleranslar</span>
+              <input
+                class="odv-input"
+                [formField]="f.allergies"
+                placeholder="Örn. laktoz, gluten"
+              />
+            </label>
+            <div class="mt-2 flex flex-wrap gap-1">
+              @for (alg of commonAllergies; track alg) {
+                <button
+                  type="button"
+                  (click)="toggleAllergyChip(alg)"
+                  class="rounded-full border border-slate-200 px-2.5 py-0.5 text-[11px] font-semibold text-slate-600 transition hover:border-rose-400 hover:text-rose-700 dark:border-slate-700 dark:text-slate-300"
+                >
+                  + {{ alg }}
+                </button>
+              }
+            </div>
+          </div>
         </div>
+
+        <label class="mt-4 block">
+          <span class="odv-label">Klinik anamnez, ilaç kullanımı ve beslenme öyküsü notları</span>
+          <textarea
+            class="odv-input min-h-20 resize-y"
+            [ngModel]="model().clinicalNotes"
+            [ngModelOptions]="{ standalone: true }"
+            (ngModelChange)="patchModel({ clinicalNotes: $event })"
+            placeholder="Kullandığı ilaçlar (Metformin, Levotiroksin vb.), uyku düzeni, su tüketimi, sevmediği besinler…"
+          ></textarea>
+        </label>
+
         <label
           class="mt-5 flex items-start gap-3 rounded-xl border border-slate-200 p-4 dark:border-slate-700"
         >
@@ -258,6 +410,9 @@ export class ClientForm {
   readonly editing = computed(() => this.qa.state()?.kind === 'client-edit');
   readonly activityOptions = Object.entries(ACTIVITY_LABELS);
   readonly programOptions = Object.entries(PROGRAM_LABELS);
+  readonly commonConditions = COMMON_CONDITIONS;
+  readonly commonAllergies = COMMON_ALLERGIES;
+
   readonly model = signal<ClientDraft>({ ...EMPTY });
   private readonly initial = signal<ClientDraft>({ ...EMPTY });
   readonly f = form(this.model, (p) => {
@@ -283,14 +438,29 @@ export class ClientForm {
     const bmiValue = bmi(v.startWeightKg, v.heightCm);
     const band = bmiBand(bmiValue);
     const bmrValue = bmr(v.sex, v.startWeightKg, v.heightCm, age);
+    const hbBmr = harrisBenedictBmr(v.sex, v.startWeightKg, v.heightCm, age);
     const tdeeValue = tdee(bmrValue, v.activity);
+    const ideal = idealWeightRange(v.heightCm);
+    const waterL = waterNeedLiters(v.startWeightKg, v.activity);
+    const whr =
+      v.waistCm && v.hipCm ? waistHipRisk(v.sex, v.waistCm, v.hipCm) : null;
+    const weeksToGoal = estimatedWeeksToGoal(
+      v.startWeightKg,
+      v.targetWeightKg ?? v.startWeightKg,
+    );
     return {
       bmi: bmiValue,
       band: band.label,
       bandClass: toneClass(band.tone),
       bmr: bmrValue,
+      hbBmr,
       tdee: tdeeValue,
       suggested: suggestedKcal(tdeeValue, v.program),
+      idealMin: ideal.minKg,
+      idealMax: ideal.maxKg,
+      waterL,
+      whr,
+      weeksToGoal,
     };
   });
 
@@ -304,6 +474,28 @@ export class ClientForm {
 
   setSex(sex: Sex): void {
     this.model.update((v) => ({ ...v, sex }));
+  }
+
+  patchModel(patch: Partial<ClientDraft>): void {
+    this.model.update((v) => ({ ...v, ...patch }));
+  }
+
+  toggleConditionChip(item: string): void {
+    const list = splitList(this.model().conditions);
+    const exists = list.some((x) => x.toLocaleLowerCase('tr') === item.toLocaleLowerCase('tr'));
+    const next = exists
+      ? list.filter((x) => x.toLocaleLowerCase('tr') !== item.toLocaleLowerCase('tr'))
+      : [...list, item];
+    this.patchModel({ conditions: next.join(', ') });
+  }
+
+  toggleAllergyChip(item: string): void {
+    const list = splitList(this.model().allergies);
+    const exists = list.some((x) => x.toLocaleLowerCase('tr') === item.toLocaleLowerCase('tr'));
+    const next = exists
+      ? list.filter((x) => x.toLocaleLowerCase('tr') !== item.toLocaleLowerCase('tr'))
+      : [...list, item];
+    this.patchModel({ allergies: next.join(', ') });
   }
 
   save(): void {
@@ -325,6 +517,11 @@ export class ClientForm {
         heightCm: v.heightCm!,
         startWeightKg: v.startWeightKg!,
         targetWeightKg: v.targetWeightKg!,
+        waistCm: v.waistCm ?? undefined,
+        hipCm: v.hipCm ?? undefined,
+        bodyFatPct: v.bodyFatPct ?? undefined,
+        waterTargetL: v.waterTargetL ?? waterNeedLiters(v.startWeightKg!, v.activity),
+        clinicalNotes: v.clinicalNotes.trim() || undefined,
         activity: v.activity,
         program: v.program,
         conditions: splitList(v.conditions),
@@ -332,7 +529,10 @@ export class ClientForm {
         consentAt: v.consent ? (existing?.consentAt ?? isoDate(new Date())) : null,
         status: existing?.status ?? 'active',
       });
-      this.notify.success(existing ? 'Değişiklikler kaydedildi' : 'Danışan eklendi', `${saved.firstName} ${saved.lastName}`);
+      this.notify.success(
+        existing ? 'Değişiklikler kaydedildi' : 'Danışan eklendi',
+        `${saved.firstName} ${saved.lastName}`,
+      );
       this.qa.open('client-detail', saved.id);
     });
   }
@@ -350,10 +550,15 @@ export class ClientForm {
           heightCm: client.heightCm,
           startWeightKg: client.startWeightKg,
           targetWeightKg: client.targetWeightKg,
+          waistCm: client.waistCm ?? null,
+          hipCm: client.hipCm ?? null,
+          bodyFatPct: client.bodyFatPct ?? null,
+          waterTargetL: client.waterTargetL ?? null,
           activity: client.activity,
           program: client.program,
           conditions: client.conditions.join(', '),
           allergies: client.allergies.join(', '),
+          clinicalNotes: client.clinicalNotes ?? '',
           consent: Boolean(client.consentAt),
         }
       : { ...EMPTY };
