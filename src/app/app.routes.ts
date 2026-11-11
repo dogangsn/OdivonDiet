@@ -13,6 +13,12 @@ export const routes: Routes = [
     data: { mode: 'register' },
   },
   {
+    path: 'verify-email',
+    title: 'E-posta doğrulama · OdivonDiet',
+    loadComponent: () => import('./features/auth/auth-page').then((m) => m.AuthPage),
+    data: { mode: 'verify' },
+  },
+  {
     path: 'portal/login',
     title: 'Danışan girişi · OdivonDiet',
     loadComponent: () => import('./features/auth/auth-page').then((m) => m.AuthPage),

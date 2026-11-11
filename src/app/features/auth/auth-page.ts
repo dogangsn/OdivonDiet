@@ -1,7 +1,13 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, DestroyRef, inject, signal } from '@angular/core';
 import { email, FormField, form, minLength, required, submit } from '@angular/forms/signals';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { AuthStore, PortalAccessError } from '../../core/auth/auth-store';
+import {
+  AuthStore,
+  EmailNotVerifiedError,
+  PortalAccessError,
+  VerificationError,
+} from '../../core/auth/auth-store';
+import { Notify } from '../../core/notify/notify';
 import { ThemeStore } from '../../core/theme/theme-store';
 import { PRODUCT } from '../../domain/product-manifest';
 import { VersionBadge } from '../../shared/ui/version-badge';
@@ -223,199 +229,367 @@ import { VersionBadge } from '../../shared/ui/version-badge';
 
         <div class="relative flex flex-1 items-center justify-center px-5 py-10 sm:px-8 lg:py-6">
           <div class="w-full max-w-[25rem] animate-fade-up">
-            @if (!isRegister) {
-              <nav
-                class="mb-8 grid grid-cols-2 rounded-xl border border-slate-200 bg-white p-1 text-sm font-bold shadow-sm dark:border-slate-800 dark:bg-slate-900"
-                aria-label="Giriş türü"
+            @if (isVerify) {
+              <span
+                class="grid size-14 place-items-center rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 text-white shadow-lg shadow-violet-500/30"
               >
-                <a
-                  routerLink="/login"
-                  class="flex items-center justify-center gap-1.5 rounded-lg py-2 transition-colors"
-                  [class]="
-                    isMember
-                      ? 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white'
-                      : 'bg-violet-50 text-violet-700 dark:bg-violet-500/15 dark:text-violet-200'
-                  "
-                  [attr.aria-current]="isMember ? null : 'page'"
-                  ><span class="material-symbols-rounded !text-lg" aria-hidden="true"
-                    >stethoscope</span
-                  >Diyetisyen</a
+                <span class="material-symbols-rounded icon-fill !text-3xl" aria-hidden="true">{{
+                  linkState() === 'done' ? 'mark_email_read' : 'mark_email_unread'
+                }}</span>
+              </span>
+              <h2 class="mt-6 text-[1.75rem] font-extrabold leading-tight tracking-tight">
+                {{ linkState() === 'done' ? 'E-postanız doğrulandı' : 'E-postanızı doğrulayın' }}
+              </h2>
+              @if (linkState() === 'checking') {
+                <p class="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400" role="status">
+                  Doğrulama bağlantınız kontrol ediliyor…
+                </p>
+              } @else if (linkState() === 'done') {
+                <p class="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400" role="status">
+                  Hesabınız etkinleştirildi. Devam etmek için giriş yapın.
+                </p>
+                <a class="odv-btn-primary !min-h-12 mt-8 w-full !text-sm" routerLink="/login"
+                  >Giriş yap</a
                 >
-                <a
-                  routerLink="/portal/login"
-                  class="flex items-center justify-center gap-1.5 rounded-lg py-2 transition-colors"
-                  [class]="
-                    isMember
-                      ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200'
-                      : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white'
-                  "
-                  [attr.aria-current]="isMember ? 'page' : null"
-                  ><span class="material-symbols-rounded !text-lg" aria-hidden="true">favorite</span
-                  >Danışan</a
+              } @else if (pending(); as p) {
+                <p class="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
+                  <strong class="text-slate-800 dark:text-white">{{ p.email }}</strong>
+                  adresine
+                  {{
+                    p.demo
+                      ? '6 haneli bir doğrulama kodu gönderdik. Hesabınız kod girilene kadar etkin olmaz.'
+                      : 'bir doğrulama bağlantısı gönderdik. Bağlantıya tıklayana kadar hesabınız etkin olmaz.'
+                  }}
+                </p>
+
+                @if (p.demo) {
+                  <div
+                    class="mt-6 flex items-start gap-2.5 rounded-xl border border-violet-200 bg-violet-50 p-3 text-xs leading-5 text-violet-800 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-200"
+                  >
+                    <span class="material-symbols-rounded !text-base" aria-hidden="true">info</span>
+                    <span
+                      >Demo modunda gerçek e-posta gönderilmez. Doğrulama kodunuz:
+                      <strong class="font-mono text-sm tracking-[.2em]">{{ p.code }}</strong></span
+                    >
+                  </div>
+                  <form class="mt-6 space-y-4" (submit)="onVerifyCode($event)" novalidate>
+                    <label class="block">
+                      <span class="odv-label">Doğrulama kodu</span>
+                      <input
+                        class="odv-input !py-3 text-center font-mono !text-lg tracking-[.5em]"
+                        inputmode="numeric"
+                        autocomplete="one-time-code"
+                        maxlength="6"
+                        placeholder="••••••"
+                        [value]="code()"
+                        (input)="onCodeInput($event)"
+                      />
+                    </label>
+                    @if (error()) {
+                      <div role="alert" class="odv-auth-alert">
+                        <span class="material-symbols-rounded !text-base" aria-hidden="true"
+                          >error</span
+                        >
+                        {{ error() }}
+                      </div>
+                    }
+                    <button
+                      class="odv-btn-primary !min-h-12 w-full !text-sm"
+                      type="submit"
+                      [disabled]="code().length !== 6"
+                    >
+                      Doğrula ve devam et
+                    </button>
+                  </form>
+                } @else {
+                  <ol
+                    class="mt-6 space-y-2.5 rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
+                  >
+                    <li class="flex gap-2.5">
+                      <span
+                        class="material-symbols-rounded !text-lg text-violet-500"
+                        aria-hidden="true"
+                        >inbox</span
+                      >
+                      Gelen kutunuzu (ve gereksiz klasörünü) açın.
+                    </li>
+                    <li class="flex gap-2.5">
+                      <span
+                        class="material-symbols-rounded !text-lg text-violet-500"
+                        aria-hidden="true"
+                        >link</span
+                      >
+                      OdivonDiet doğrulama bağlantısına tıklayın.
+                    </li>
+                    <li class="flex gap-2.5">
+                      <span
+                        class="material-symbols-rounded !text-lg text-violet-500"
+                        aria-hidden="true"
+                        >task_alt</span
+                      >
+                      Bu sayfaya dönüp devam edin.
+                    </li>
+                  </ol>
+                  @if (error()) {
+                    <div role="alert" class="odv-auth-alert mt-4">
+                      <span class="material-symbols-rounded !text-base" aria-hidden="true"
+                        >error</span
+                      >
+                      {{ error() }}
+                    </div>
+                  }
+                  <button
+                    class="odv-btn-primary !min-h-12 mt-6 w-full !text-sm"
+                    type="button"
+                    [disabled]="busy()"
+                    (click)="onConfirmVerified()"
+                  >
+                    {{ busy() ? 'Kontrol ediliyor…' : 'Doğruladım, devam et' }}
+                  </button>
+                }
+
+                <button
+                  type="button"
+                  class="odv-btn-secondary !min-h-12 mt-3 w-full !text-sm dark:!border-slate-800 dark:!bg-slate-900 dark:hover:!bg-slate-800"
+                  [disabled]="resendWait() > 0 || busy()"
+                  (click)="onResend()"
                 >
-              </nav>
-            }
+                  <span class="material-symbols-rounded !text-lg text-violet-500" aria-hidden="true"
+                    >forward_to_inbox</span
+                  >
+                  {{
+                    resendWait() > 0
+                      ? 'Tekrar gönder (' + resendWait() + ' sn)'
+                      : p.demo
+                        ? 'Yeni kod gönder'
+                        : 'Bağlantıyı tekrar gönder'
+                  }}
+                </button>
+                <p class="mt-6 text-center text-sm text-slate-500 dark:text-slate-400">
+                  Yanlış adres mi?
+                  <button
+                    type="button"
+                    class="font-bold text-violet-600 hover:underline dark:text-violet-400"
+                    (click)="onChangeEmail()"
+                  >
+                    Farklı e-postayla kaydol
+                  </button>
+                </p>
+              } @else {
+                @if (error()) {
+                  <div role="alert" class="odv-auth-alert mt-4">
+                    <span class="material-symbols-rounded !text-base" aria-hidden="true"
+                      >error</span
+                    >
+                    {{ error() }}
+                  </div>
+                } @else {
+                  <p class="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
+                    Doğrulama bekleyen bir kayıt bulunamadı.
+                  </p>
+                }
+                <a class="odv-btn-primary !min-h-12 mt-8 w-full !text-sm" routerLink="/login"
+                  >Giriş sayfasına dön</a
+                >
+              }
+            } @else {
+              @if (!isRegister) {
+                <nav
+                  class="mb-8 grid grid-cols-2 rounded-xl border border-slate-200 bg-white p-1 text-sm font-bold shadow-sm dark:border-slate-800 dark:bg-slate-900"
+                  aria-label="Giriş türü"
+                >
+                  <a
+                    routerLink="/login"
+                    class="flex items-center justify-center gap-1.5 rounded-lg py-2 transition-colors"
+                    [class]="
+                      isMember
+                        ? 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white'
+                        : 'bg-violet-50 text-violet-700 dark:bg-violet-500/15 dark:text-violet-200'
+                    "
+                    [attr.aria-current]="isMember ? null : 'page'"
+                    ><span class="material-symbols-rounded !text-lg" aria-hidden="true"
+                      >stethoscope</span
+                    >Diyetisyen</a
+                  >
+                  <a
+                    routerLink="/portal/login"
+                    class="flex items-center justify-center gap-1.5 rounded-lg py-2 transition-colors"
+                    [class]="
+                      isMember
+                        ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200'
+                        : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white'
+                    "
+                    [attr.aria-current]="isMember ? 'page' : null"
+                    ><span class="material-symbols-rounded !text-lg" aria-hidden="true"
+                      >favorite</span
+                    >Danışan</a
+                  >
+                </nav>
+              }
 
-            <h2 class="text-[1.75rem] font-extrabold leading-tight tracking-tight">
-              {{
-                isRegister
-                  ? 'Hesabınızı oluşturun'
-                  : isMember
-                    ? 'Danışan portalına hoş geldiniz'
-                    : 'Tekrar hoş geldiniz'
-              }}
-            </h2>
-            <p class="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
-              {{
-                isRegister
-                  ? 'Muayenehanenizi birkaç dakikada dijitale taşıyın.'
-                  : isMember
-                    ? 'Planınızı, ölçümlerinizi ve diyetisyeninizle mesajlarınızı görün.'
-                    : 'Klinik çalışma alanınıza güvenli erişim sağlayın.'
-              }}
-            </p>
+              <h2 class="text-[1.75rem] font-extrabold leading-tight tracking-tight">
+                {{
+                  isRegister
+                    ? 'Hesabınızı oluşturun'
+                    : isMember
+                      ? 'Danışan portalına hoş geldiniz'
+                      : 'Tekrar hoş geldiniz'
+                }}
+              </h2>
+              <p class="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
+                {{
+                  isRegister
+                    ? 'Muayenehanenizi birkaç dakikada dijitale taşıyın.'
+                    : isMember
+                      ? 'Planınızı, ölçümlerinizi ve diyetisyeninizle mesajlarınızı görün.'
+                      : 'Klinik çalışma alanınıza güvenli erişim sağlayın.'
+                }}
+              </p>
 
-            <form class="mt-8 space-y-4" (submit)="onSubmit($event)" novalidate>
-              @if (isRegister) {
+              <form class="mt-8 space-y-4" (submit)="onSubmit($event)" novalidate>
+                @if (isRegister) {
+                  <label class="block">
+                    <span class="odv-label">Ad soyad</span>
+                    <span class="relative block">
+                      <span
+                        class="material-symbols-rounded pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 !text-lg text-slate-400"
+                        aria-hidden="true"
+                        >person</span
+                      >
+                      <input
+                        class="odv-input !py-3 ps-10"
+                        [formField]="authForm.name"
+                        autocomplete="name"
+                        placeholder="Dyt. Ad Soyad"
+                      />
+                    </span>
+                    @if (authForm.name().touched() && authForm.name().invalid()) {
+                      <span class="odv-error">Ad soyad zorunludur.</span>
+                    }
+                  </label>
+                  <label class="block">
+                    <span class="odv-label">Muayenehane / klinik adı</span>
+                    <span class="relative block">
+                      <span
+                        class="material-symbols-rounded pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 !text-lg text-slate-400"
+                        aria-hidden="true"
+                        >apartment</span
+                      >
+                      <input
+                        class="odv-input !py-3 ps-10"
+                        [formField]="authForm.company"
+                        autocomplete="organization"
+                        placeholder="İsteğe bağlı"
+                      />
+                    </span>
+                  </label>
+                }
                 <label class="block">
-                  <span class="odv-label">Ad soyad</span>
+                  <span class="odv-label">E-posta</span>
                   <span class="relative block">
                     <span
                       class="material-symbols-rounded pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 !text-lg text-slate-400"
                       aria-hidden="true"
-                      >person</span
+                      >mail</span
                     >
                     <input
                       class="odv-input !py-3 ps-10"
-                      [formField]="authForm.name"
-                      autocomplete="name"
-                      placeholder="Dyt. Ad Soyad"
+                      type="email"
+                      [formField]="authForm.email"
+                      autocomplete="email"
+                      placeholder="ornek@klinik.com"
                     />
                   </span>
-                  @if (authForm.name().touched() && authForm.name().invalid()) {
-                    <span class="odv-error">Ad soyad zorunludur.</span>
+                  @if (authForm.email().touched() && authForm.email().invalid()) {
+                    <span class="odv-error">Geçerli bir e-posta girin.</span>
                   }
                 </label>
                 <label class="block">
-                  <span class="odv-label">Muayenehane / klinik adı</span>
+                  <span class="odv-label">Şifre</span>
                   <span class="relative block">
                     <span
                       class="material-symbols-rounded pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 !text-lg text-slate-400"
                       aria-hidden="true"
-                      >apartment</span
+                      >lock</span
                     >
                     <input
-                      class="odv-input !py-3 ps-10"
-                      [formField]="authForm.company"
-                      autocomplete="organization"
-                      placeholder="İsteğe bağlı"
+                      class="odv-input !py-3 ps-10 pe-12"
+                      [type]="showPassword() ? 'text' : 'password'"
+                      [formField]="authForm.password"
+                      [autocomplete]="isRegister ? 'new-password' : 'current-password'"
+                      placeholder="En az 8 karakter"
                     />
+                    <button
+                      class="odv-icon-btn absolute end-1 top-1/2 !size-9 -translate-y-1/2"
+                      type="button"
+                      (click)="showPassword.update((v) => !v)"
+                      [attr.aria-label]="showPassword() ? 'Şifreyi gizle' : 'Şifreyi göster'"
+                    >
+                      <span class="material-symbols-rounded !text-lg">{{
+                        showPassword() ? 'visibility_off' : 'visibility'
+                      }}</span>
+                    </button>
                   </span>
+                  @if (authForm.password().touched() && authForm.password().invalid()) {
+                    <span class="odv-error">Şifre en az 8 karakter olmalıdır.</span>
+                  }
                 </label>
-              }
-              <label class="block">
-                <span class="odv-label">E-posta</span>
-                <span class="relative block">
-                  <span
-                    class="material-symbols-rounded pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 !text-lg text-slate-400"
-                    aria-hidden="true"
-                    >mail</span
+                @if (error()) {
+                  <div
+                    role="alert"
+                    class="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/50 dark:text-rose-300"
                   >
-                  <input
-                    class="odv-input !py-3 ps-10"
-                    type="email"
-                    [formField]="authForm.email"
-                    autocomplete="email"
-                    placeholder="ornek@klinik.com"
-                  />
-                </span>
-                @if (authForm.email().touched() && authForm.email().invalid()) {
-                  <span class="odv-error">Geçerli bir e-posta girin.</span>
+                    <span class="material-symbols-rounded !text-base" aria-hidden="true"
+                      >error</span
+                    >
+                    {{ error() }}
+                  </div>
                 }
-              </label>
-              <label class="block">
-                <span class="odv-label">Şifre</span>
-                <span class="relative block">
-                  <span
-                    class="material-symbols-rounded pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 !text-lg text-slate-400"
-                    aria-hidden="true"
-                    >lock</span
-                  >
-                  <input
-                    class="odv-input !py-3 ps-10 pe-12"
-                    [type]="showPassword() ? 'text' : 'password'"
-                    [formField]="authForm.password"
-                    [autocomplete]="isRegister ? 'new-password' : 'current-password'"
-                    placeholder="En az 8 karakter"
-                  />
-                  <button
-                    class="odv-icon-btn absolute end-1 top-1/2 !size-9 -translate-y-1/2"
-                    type="button"
-                    (click)="showPassword.update((v) => !v)"
-                    [attr.aria-label]="showPassword() ? 'Şifreyi gizle' : 'Şifreyi göster'"
-                  >
-                    <span class="material-symbols-rounded !text-lg">{{
-                      showPassword() ? 'visibility_off' : 'visibility'
-                    }}</span>
-                  </button>
-                </span>
-                @if (authForm.password().touched() && authForm.password().invalid()) {
-                  <span class="odv-error">Şifre en az 8 karakter olmalıdır.</span>
-                }
-              </label>
-              @if (error()) {
-                <div
-                  role="alert"
-                  class="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/50 dark:text-rose-300"
+                <button
+                  class="odv-btn-primary group !min-h-12 w-full !text-sm"
+                  type="submit"
+                  [disabled]="busy()"
                 >
-                  <span class="material-symbols-rounded !text-base" aria-hidden="true">error</span>
-                  {{ error() }}
-                </div>
-              }
+                  {{ busy() ? 'İşleniyor…' : isRegister ? 'Hesap oluştur' : 'Giriş yap' }}
+                  @if (!busy()) {
+                    <span
+                      class="material-symbols-rounded directional-icon !text-lg transition-transform group-hover:translate-x-0.5"
+                      aria-hidden="true"
+                      >arrow_forward</span
+                    >
+                  }
+                </button>
+              </form>
+
+              <div class="my-6 flex items-center gap-3 text-xs font-semibold text-slate-400">
+                <span class="h-px flex-1 bg-slate-200 dark:bg-slate-800"></span>veya<span
+                  class="h-px flex-1 bg-slate-200 dark:bg-slate-800"
+                ></span>
+              </div>
               <button
-                class="odv-btn-primary group !min-h-12 w-full !text-sm"
-                type="submit"
-                [disabled]="busy()"
+                type="button"
+                class="odv-btn-secondary !min-h-12 w-full !text-sm dark:!border-slate-800 dark:!bg-slate-900 dark:hover:!bg-slate-800"
+                (click)="demo()"
               >
-                {{ busy() ? 'İşleniyor…' : isRegister ? 'Hesap oluştur' : 'Giriş yap' }}
-                @if (!busy()) {
-                  <span
-                    class="material-symbols-rounded directional-icon !text-lg transition-transform group-hover:translate-x-0.5"
-                    aria-hidden="true"
-                    >arrow_forward</span
-                  >
-                }
+                <span class="material-symbols-rounded !text-lg text-violet-500" aria-hidden="true"
+                  >play_circle</span
+                >{{ isMember ? 'Demo danışan olarak incele' : 'Demo verilerle incele' }}
               </button>
-            </form>
 
-            <div class="my-6 flex items-center gap-3 text-xs font-semibold text-slate-400">
-              <span class="h-px flex-1 bg-slate-200 dark:bg-slate-800"></span>veya<span
-                class="h-px flex-1 bg-slate-200 dark:bg-slate-800"
-              ></span>
-            </div>
-            <button
-              type="button"
-              class="odv-btn-secondary !min-h-12 w-full !text-sm dark:!border-slate-800 dark:!bg-slate-900 dark:hover:!bg-slate-800"
-              (click)="demo()"
-            >
-              <span class="material-symbols-rounded !text-lg text-violet-500" aria-hidden="true"
-                >play_circle</span
-              >{{ isMember ? 'Demo danışan olarak incele' : 'Demo verilerle incele' }}
-            </button>
-
-            @if (isMember) {
-              <p class="mt-6 text-center text-sm text-slate-500 dark:text-slate-400">
-                Portal hesabınızı diyetisyeniniz açar; davet e-postasındaki adresle giriş yapın.
-              </p>
-            } @else {
-              <p class="mt-6 text-center text-sm text-slate-500 dark:text-slate-400">
-                {{ isRegister ? 'Zaten hesabınız var mı?' : 'Henüz hesabınız yok mu?' }}
-                <a
-                  class="font-bold text-violet-600 hover:underline dark:text-violet-400"
-                  [routerLink]="isRegister ? '/login' : '/register'"
-                  >{{ isRegister ? 'Giriş yapın' : 'Hesap oluşturun' }}</a
-                >
-              </p>
+              @if (isMember) {
+                <p class="mt-6 text-center text-sm text-slate-500 dark:text-slate-400">
+                  Portal hesabınızı diyetisyeniniz açar; davet e-postasındaki adresle giriş yapın.
+                </p>
+              } @else {
+                <p class="mt-6 text-center text-sm text-slate-500 dark:text-slate-400">
+                  {{ isRegister ? 'Zaten hesabınız var mı?' : 'Henüz hesabınız yok mu?' }}
+                  <a
+                    class="font-bold text-violet-600 hover:underline dark:text-violet-400"
+                    [routerLink]="isRegister ? '/login' : '/register'"
+                    >{{ isRegister ? 'Giriş yapın' : 'Hesap oluşturun' }}</a
+                  >
+                </p>
+              }
             }
           </div>
         </div>
@@ -437,8 +611,9 @@ export class AuthPage {
   readonly product = PRODUCT;
   readonly theme = inject(ThemeStore);
   private readonly mode = inject(ActivatedRoute).snapshot.data['mode'] as
-    'login' | 'register' | 'member';
+    'login' | 'register' | 'member' | 'verify';
   readonly isRegister = this.mode === 'register';
+  readonly isVerify = this.mode === 'verify';
   readonly isMember = this.mode === 'member';
   readonly showPassword = signal(false);
   readonly busy = signal(false);
@@ -453,6 +628,106 @@ export class AuthPage {
   });
   private readonly auth = inject(AuthStore);
   private readonly router = inject(Router);
+  private readonly notify = inject(Notify);
+  private readonly route = inject(ActivatedRoute);
+  readonly pending = this.auth.pendingVerification;
+  readonly code = signal('');
+  readonly resendWait = signal(0);
+  /** State of a verification link (`?oobCode=`) opened in this app. */
+  readonly linkState = signal<'none' | 'checking' | 'done'>('none');
+
+  constructor() {
+    if (!this.isVerify) return;
+    this.tickResend();
+    const timer = setInterval(() => this.tickResend(), 1000);
+    inject(DestroyRef).onDestroy(() => clearInterval(timer));
+    const params = this.route.snapshot.queryParamMap;
+    const oobCode = params.get('oobCode');
+    if (oobCode && params.get('mode') !== 'resetPassword') void this.applyLink(oobCode);
+  }
+
+  private tickResend(): void {
+    this.resendWait.set(this.auth.resendWaitSeconds());
+  }
+
+  private async applyLink(oobCode: string): Promise<void> {
+    this.linkState.set('checking');
+    try {
+      if (await this.auth.applyVerificationLink(oobCode)) {
+        await this.finishVerification();
+        return;
+      }
+      this.linkState.set('done');
+    } catch (error) {
+      this.linkState.set('none');
+      this.error.set(error instanceof VerificationError ? error.message : this.genericError);
+    }
+  }
+
+  private readonly genericError = 'İşlem tamamlanamadı. Bilgilerinizi kontrol edip tekrar deneyin.';
+
+  onCodeInput(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const digits = input.value.replace(/\D/g, '').slice(0, 6);
+    input.value = digits;
+    this.code.set(digits);
+    this.error.set('');
+  }
+
+  async onVerifyCode(event: Event): Promise<void> {
+    event.preventDefault();
+    try {
+      this.auth.verifyCode(this.code());
+      await this.finishVerification();
+    } catch (error) {
+      this.error.set(error instanceof VerificationError ? error.message : this.genericError);
+    }
+  }
+
+  async onConfirmVerified(): Promise<void> {
+    this.busy.set(true);
+    this.error.set('');
+    try {
+      await this.auth.confirmVerified();
+      await this.finishVerification();
+    } catch (error) {
+      this.error.set(error instanceof VerificationError ? error.message : this.genericError);
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  async onResend(): Promise<void> {
+    this.busy.set(true);
+    this.error.set('');
+    try {
+      await this.auth.resendVerification();
+      this.code.set('');
+      this.tickResend();
+      this.notify.success(
+        this.pending()?.demo ? 'Yeni kod oluşturuldu' : 'Doğrulama e-postası gönderildi',
+        this.pending()?.email,
+      );
+    } catch (error) {
+      this.error.set(
+        error instanceof VerificationError
+          ? error.message
+          : 'E-posta gönderilemedi. Birkaç dakika sonra tekrar deneyin.',
+      );
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  async onChangeEmail(): Promise<void> {
+    this.auth.cancelVerification();
+    await this.router.navigateByUrl('/register');
+  }
+
+  private async finishVerification(): Promise<void> {
+    this.notify.success('E-postanız doğrulandı', 'Hesabınız etkinleştirildi.');
+    await this.router.navigateByUrl(this.auth.homePath());
+  }
   onSubmit(event: Event): void {
     event.preventDefault();
     submit(this.authForm, async () => {
@@ -464,13 +739,13 @@ export class AuthPage {
           await this.auth.register(value.name, value.email, value.password, value.company.trim());
         else if (this.isMember) await this.auth.signInMember(value.email, value.password);
         else await this.auth.signIn(value.email, value.password);
-        await this.router.navigateByUrl(this.auth.homePath());
+        await this.router.navigateByUrl(this.isRegister ? '/verify-email' : this.auth.homePath());
       } catch (error) {
-        this.error.set(
-          error instanceof PortalAccessError
-            ? error.message
-            : 'İşlem tamamlanamadı. Bilgilerinizi kontrol edip tekrar deneyin.',
-        );
+        if (error instanceof EmailNotVerifiedError) {
+          await this.router.navigateByUrl('/verify-email');
+          return;
+        }
+        this.error.set(error instanceof PortalAccessError ? error.message : this.genericError);
       } finally {
         this.busy.set(false);
       }

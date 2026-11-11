@@ -16,6 +16,36 @@ export interface AppSession {
 /** Thrown when a login exists but is not allowed into the chosen area. */
 export class PortalAccessError extends Error {}
 
+/** Thrown when the account exists but its e-mail address is not verified yet. */
+export class EmailNotVerifiedError extends Error {}
+
+/** Thrown when a verification code or link is wrong, expired or not confirmed yet. */
+export class VerificationError extends Error {}
+
+/** A registration waiting for its e-mail address to be confirmed. */
+export interface PendingVerification {
+  readonly name: string;
+  readonly email: string;
+  readonly practice: string;
+  readonly demo: boolean;
+  /** Demo mode only: there is no mail server, so the 6-digit code is kept locally. */
+  readonly code?: string;
+  readonly expiresAt?: number;
+  /** When the last e-mail went out; drives the resend cooldown. */
+  readonly sentAt: number;
+}
+
+/** Minimum wait between two verification e-mails. */
+export const RESEND_COOLDOWN_MS = 60_000;
+/** Lifetime of a demo verification code. */
+export const CODE_TTL_MS = 15 * 60_000;
+
+function newCode(): string {
+  const value = new Uint32Array(1);
+  crypto.getRandomValues(value);
+  return String(value[0] % 1_000_000).padStart(6, '0');
+}
+
 /** Home route for each role. */
 export const HOME_BY_ROLE: Record<UserRole, string> = {
   dietitian: '/overview',
@@ -27,7 +57,9 @@ export class AuthStore {
   private readonly identity = inject(FirebaseIdentity);
   private readonly injector = inject(Injector);
   private readonly storageKey = 'odivon:session';
+  private readonly pendingKey = 'odivon:pending-verification';
   readonly session = signal<AppSession | null>(this.restore());
+  readonly pendingVerification = signal<PendingVerification | null>(this.restorePending());
   readonly isAuthenticated = computed(() => this.session() !== null);
   readonly role = computed<UserRole | null>(() => {
     const session = this.session();
@@ -37,6 +69,10 @@ export class AuthStore {
 
   async signIn(email: string, password: string): Promise<void> {
     if (!this.identity.configured) {
+      const pending = this.pendingVerification();
+      if (pending?.demo && pending.email.toLowerCase() === email.toLowerCase()) {
+        throw new EmailNotVerifiedError('E-posta adresiniz henüz doğrulanmadı.');
+      }
       this.persist({
         name: email.split('@')[0] || 'Odivon Kullanıcısı',
         email,
@@ -50,6 +86,17 @@ export class AuthStore {
     if (claims.role === 'member') {
       await this.identity.logout();
       throw new PortalAccessError('Bu hesap danışan hesabı. Danışan girişini kullanın.');
+    }
+    if (!user.emailVerified) {
+      // Stay signed in to Firebase so the verification e-mail can be resent.
+      this.setPending({
+        name: user.displayName || email.split('@')[0],
+        email,
+        practice: '',
+        demo: false,
+        sentAt: 0,
+      });
+      throw new EmailNotVerifiedError('E-posta adresiniz henüz doğrulanmadı.');
     }
     this.persist({
       name: user.displayName || email.split('@')[0],
@@ -96,19 +143,110 @@ export class AuthStore {
     });
   }
 
+  /**
+   * Creates the account but does not sign it in: the e-mail address must be verified first.
+   * With Firebase the verification link is sent by Firebase Auth; in demo mode there is no
+   * mail server, so a 6-digit code is generated locally and shown on the verification screen.
+   */
   async register(name: string, email: string, password: string, practice = ''): Promise<void> {
     if (!this.identity.configured) {
-      this.persist({ name, email, demo: true, practice, role: 'dietitian' });
+      this.setPending({
+        name,
+        email,
+        practice,
+        demo: true,
+        code: newCode(),
+        expiresAt: Date.now() + CODE_TTL_MS,
+        sentAt: Date.now(),
+      });
       return;
     }
     const user = await this.identity.register(name, email, password);
-    this.persist({
+    this.setPending({
       name: user.displayName || name,
       email,
-      demo: false,
       practice,
-      role: 'dietitian',
+      demo: false,
+      sentAt: Date.now(),
     });
+  }
+
+  /** Seconds left before another verification e-mail may be requested. */
+  resendWaitSeconds(now = Date.now()): number {
+    const pending = this.pendingVerification();
+    if (!pending) return 0;
+    return Math.max(0, Math.ceil((pending.sentAt + RESEND_COOLDOWN_MS - now) / 1000));
+  }
+
+  async resendVerification(): Promise<void> {
+    const pending = this.pendingVerification();
+    if (!pending) throw new VerificationError('Doğrulama bekleyen bir kayıt yok.');
+    if (this.resendWaitSeconds() > 0) {
+      throw new VerificationError('Yeni e-posta için biraz bekleyin.');
+    }
+    if (pending.demo) {
+      this.setPending({
+        ...pending,
+        code: newCode(),
+        expiresAt: Date.now() + CODE_TTL_MS,
+        sentAt: Date.now(),
+      });
+      return;
+    }
+    await this.identity.sendVerification();
+    this.setPending({ ...pending, sentAt: Date.now() });
+  }
+
+  /** Demo mode: confirms the 6-digit code and activates the account. */
+  verifyCode(code: string): void {
+    const pending = this.pendingVerification();
+    if (!pending?.demo || !pending.code) {
+      throw new VerificationError('Doğrulama bekleyen bir kayıt yok.');
+    }
+    if (!pending.expiresAt || Date.now() > pending.expiresAt) {
+      throw new VerificationError('Kodun süresi doldu. Yeni kod isteyin.');
+    }
+    if (code.trim() !== pending.code) {
+      throw new VerificationError('Kod hatalı. E-postanızdaki 6 haneli kodu girin.');
+    }
+    this.activate(pending);
+  }
+
+  /** Firebase: checks whether the link in the e-mail was opened, then activates the account. */
+  async confirmVerified(): Promise<void> {
+    const pending = this.pendingVerification();
+    if (!pending || pending.demo) throw new VerificationError('Doğrulama bekleyen bir kayıt yok.');
+    if (!(await this.identity.refreshVerified())) {
+      throw new VerificationError(
+        'E-posta henüz doğrulanmadı. Gelen kutunuzdaki bağlantıya tıklayıp tekrar deneyin.',
+      );
+    }
+    this.activate(pending);
+  }
+
+  /**
+   * Firebase: applies a verification link opened in this app. Returns `true` when the account
+   * could be activated straight away, `false` when the user has to sign in (other device).
+   */
+  async applyVerificationLink(oobCode: string): Promise<boolean> {
+    try {
+      await this.identity.applyVerificationLink(oobCode);
+    } catch {
+      throw new VerificationError('Doğrulama bağlantısı geçersiz ya da süresi dolmuş.');
+    }
+    const pending = this.pendingVerification();
+    if (pending && !pending.demo && (await this.identity.refreshVerified())) {
+      this.activate(pending);
+      return true;
+    }
+    return false;
+  }
+
+  /** Drops the unfinished registration (e.g. to use another address). */
+  cancelVerification(): void {
+    const pending = this.pendingVerification();
+    if (pending && !pending.demo) void this.identity.logout();
+    this.setPending(null);
   }
 
   continueDemo(): void {
@@ -150,6 +288,33 @@ export class AuthStore {
       import('../data/portal-store'),
     ]);
     return { diet: this.injector.get(DietStore), portal: this.injector.get(PortalStore) };
+  }
+
+  private activate(pending: PendingVerification): void {
+    this.setPending(null);
+    this.persist({
+      name: pending.name,
+      email: pending.email,
+      demo: pending.demo,
+      practice: pending.practice,
+      role: 'dietitian',
+    });
+  }
+
+  private setPending(pending: PendingVerification | null): void {
+    if (pending) localStorage.setItem(this.pendingKey, JSON.stringify(pending));
+    else localStorage.removeItem(this.pendingKey);
+    this.pendingVerification.set(pending);
+  }
+
+  private restorePending(): PendingVerification | null {
+    try {
+      return JSON.parse(
+        localStorage.getItem(this.pendingKey) ?? 'null',
+      ) as PendingVerification | null;
+    } catch {
+      return null;
+    }
   }
 
   private persist(session: AppSession): void {

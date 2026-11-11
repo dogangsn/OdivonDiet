@@ -9,10 +9,13 @@ import {
 import {
   Auth,
   User,
+  applyActionCode,
   browserLocalPersistence,
   createUserWithEmailAndPassword,
   getAuth,
   onAuthStateChanged,
+  reload,
+  sendEmailVerification,
   setPersistence,
   signInWithEmailAndPassword,
   signOut,
@@ -86,7 +89,34 @@ export class FirebaseIdentity {
     if (!this.auth) throw new Error('Firebase Auth is not configured.');
     const user = (await createUserWithEmailAndPassword(this.auth, email, password)).user;
     await updateProfile(user, { displayName: name });
+    await this.sendVerification(user);
     return user;
+  }
+
+  /** Sends Firebase's verification e-mail; the link brings the user back to `/verify-email`. */
+  async sendVerification(user = this.auth?.currentUser ?? null): Promise<void> {
+    if (!user) throw new Error('No signed-in user to verify.');
+    await sendEmailVerification(user, {
+      url: `${globalThis.location?.origin ?? ''}/verify-email`,
+    });
+  }
+
+  /** Re-reads the signed-in user from Firebase and reports whether the e-mail is verified. */
+  async refreshVerified(): Promise<boolean> {
+    await this.initialize();
+    const user = this.auth?.currentUser;
+    if (!user) return false;
+    await reload(user);
+    // Force a fresh ID token so MainAPI sees `email_verified: true`.
+    if (user.emailVerified) await user.getIdToken(true);
+    return user.emailVerified;
+  }
+
+  /** Applies the `oobCode` from a verification link opened in this app. */
+  async applyVerificationLink(oobCode: string): Promise<void> {
+    await this.initialize();
+    if (!this.auth) throw new Error('Firebase Auth is not configured.');
+    await applyActionCode(this.auth, oobCode);
   }
 
   async logout(): Promise<void> {

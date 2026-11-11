@@ -48,7 +48,6 @@ export const PRODUCT_NAVIGATION: readonly NavigationGroup[] = [
       { path: '/settings', icon: 'settings', label: 'Ayarlar' },
     ],
   },
-<<<<<<< Updated upstream
 ];
 
 /** Domain sections used by the legacy workspace page (AI NutriPilot, client portal). */
@@ -111,6 +110,4 @@ export const WORKSPACE_DOMAINS: readonly DomainNavigationItem[] = [
     description:
       'Danışanların günlük öğün, su tüketimi, kaçamak telafisi ve kilo takibi yaptığı etkileşimli danışan arayüzü.',
   },
-=======
->>>>>>> Stashed changes
 ];
