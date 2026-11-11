@@ -1,4 +1,4 @@
-import { Injectable, computed, signal } from '@angular/core';
+import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
 import {
   ageFrom,
   bmi,
@@ -23,7 +23,27 @@ import {
   PlanStatus,
   Tone,
 } from '../../domain/diet.models';
+import { AuthStore } from '../auth/auth-store';
 import { createSeed } from './diet-seed';
+import {
+  SAMPLE_WORKSPACE,
+  loadWorkspacePart,
+  saveWorkspacePart,
+  workspaceKeyFor,
+} from './workspace';
+
+export interface DietData {
+  readonly clients: Client[];
+  readonly measurements: Measurement[];
+  readonly plans: MealPlan[];
+  readonly consultations: Consultation[];
+  readonly activity: ActivityEntry[];
+}
+
+/** A brand-new practice starts with no records at all. */
+export function emptyDietData(): DietData {
+  return { clients: [], measurements: [], plans: [], consultations: [], activity: [] };
+}
 
 export interface ClientView {
   readonly client: Client;
@@ -58,8 +78,9 @@ export const MEASUREMENT_OVERDUE_DAYS = 14;
  * Single source of truth for the dietitian workspace.
  *
  * Every page reads from these signals, so a record created on one page shows up
- * everywhere. Data is in memory for now; the mutation methods are the seam where
- * MainAPI (`/api/v1/diet`) calls will go.
+ * everywhere. Only the demo account sees the sample seed; a registered practice starts
+ * empty and its records are kept per account in local storage until MainAPI
+ * (`/api/v1/diet`) is wired in. The mutation methods are the seam for those calls.
  */
 @Injectable({ providedIn: 'root' })
 export class DietStore {

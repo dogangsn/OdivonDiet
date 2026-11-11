@@ -37,6 +37,7 @@ export const PRODUCT_NAVIGATION: readonly NavigationGroup[] = [
     label: 'Sistem',
     items: [
       { path: '/activity', icon: 'history', label: 'Aktiviteler' },
+      { path: '/billing', icon: 'workspace_premium', label: 'Abonelik' },
       { path: '/settings', icon: 'settings', label: 'Ayarlar' },
     ],
   },

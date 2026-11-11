@@ -42,6 +42,11 @@
 }
 @utility odv-label { display: block; margin-bottom: .375rem; font-size: .75rem; font-weight: 700; color: var(--color-slate-700); &:where(.dark, .dark *) { color: var(--color-slate-300); } }
 @utility odv-hint { display: block; margin-top: .25rem; font-size: .6875rem; color: var(--color-slate-500); }
+@utility odv-auth-alert {
+  display: flex; align-items: flex-start; gap: .5rem; border-radius: .75rem; border: 1px solid var(--color-rose-200);
+  background: var(--color-rose-50); padding: .75rem; font-size: .75rem; font-weight: 600; color: var(--color-rose-700);
+  &:where(.dark, .dark *) { border-color: rgb(136 19 55 / .6); background: rgb(76 5 25 / .5); color: var(--color-rose-300); }
+}
 @utility odv-error { display: block; margin-top: .25rem; font-size: .75rem; font-weight: 600; color: var(--color-rose-600); }
 
 @utility odv-card {

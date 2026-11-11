@@ -1,6 +1,7 @@
 import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { FormField, email, form, max, min, required, submit } from '@angular/forms/signals';
+import { SubscriptionStore } from '../../core/billing/subscription-store';
 import { DietStore } from '../../core/data/diet-store';
 import { Notify } from '../../core/notify/notify';
 import {
@@ -403,6 +404,7 @@ export class ClientForm {
   readonly qa = inject(QuickActions);
   private readonly store = inject(DietStore);
   private readonly notify = inject(Notify);
+  private readonly subs = inject(SubscriptionStore);
   readonly open = computed(() => {
     const kind = this.qa.state()?.kind;
     return kind === 'client-new' || kind === 'client-edit';
@@ -506,6 +508,14 @@ export class ClientForm {
         state?.kind === 'client-edit'
           ? this.store.clients().find((c) => c.id === state.clientId)
           : undefined;
+      if (!existing && !this.subs.canAddClient(this.store.activeClients().length)) {
+        const plan = this.subs.state()?.plan;
+        this.notify.warning(
+          'Danışan limitine ulaştınız',
+          `${plan?.name ?? 'Mevcut'} paketi ${plan?.clientLimit ?? ''} aktif danışana kadar. Abonelik sayfasından paketinizi yükseltin.`,
+        );
+        return;
+      }
       const saved = this.store.saveClient({
         id: existing?.id,
         firstName: v.firstName.trim(),

@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { roleGuard } from './core/auth/auth.guard';
+import { subscriptionGuard } from './core/billing/subscription.guard';
 
 export const routes: Routes = [
   {
@@ -11,6 +12,12 @@ export const routes: Routes = [
     path: 'register',
     loadComponent: () => import('./features/auth/auth-page').then((m) => m.AuthPage),
     data: { mode: 'register' },
+  },
+  {
+    path: 'verify-email',
+    title: 'E-posta doğrulama · OdivonDiet',
+    loadComponent: () => import('./features/auth/auth-page').then((m) => m.AuthPage),
+    data: { mode: 'verify' },
   },
   {
     path: 'portal/login',
@@ -26,6 +33,7 @@ export const routes: Routes = [
   {
     path: '',
     canActivate: [roleGuard('dietitian')],
+    canActivateChild: [subscriptionGuard],
     loadComponent: () => import('./layout/app-shell').then((m) => m.AppShell),
     children: [
       {
@@ -94,6 +102,11 @@ export const routes: Routes = [
         title: 'Ayarlar · OdivonDiet',
         loadComponent: () =>
           import('./features/settings/settings-page').then((m) => m.SettingsPage),
+      },
+      {
+        path: 'billing',
+        title: 'Abonelik · OdivonDiet',
+        loadComponent: () => import('./features/billing/billing-page').then((m) => m.BillingPage),
       },
       { path: '', pathMatch: 'full', redirectTo: 'overview' },
     ],
