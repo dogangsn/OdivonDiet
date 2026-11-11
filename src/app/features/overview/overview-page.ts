@@ -2,6 +2,7 @@ import { DatePipe, DecimalPipe } from '@angular/common';
 import { Component, computed, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { AuthStore } from '../../core/auth/auth-store';
+import { SubscriptionStore } from '../../core/billing/subscription-store';
 import { DietStore } from '../../core/data/diet-store';
 import {
   CHANNEL_ICONS,
@@ -43,6 +44,67 @@ import { QuickActions } from '../forms/quick-actions';
           <span class="material-symbols-rounded !text-lg">person_add</span>Yeni danışan
         </button>
       </app-page-header>
+
+      @if (store.clients().length === 0) {
+        <section
+          class="odv-card overflow-hidden border-violet-200 dark:border-violet-900"
+          aria-labelledby="welcome-title"
+        >
+          <div
+            class="flex flex-col gap-4 bg-gradient-to-br from-violet-50 to-indigo-50 p-5 dark:from-violet-500/10 dark:to-indigo-500/10 sm:flex-row sm:items-center sm:p-6"
+          >
+            <span
+              class="grid size-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 text-white shadow-md shadow-violet-500/25"
+            >
+              <span class="material-symbols-rounded icon-fill" aria-hidden="true">storefront</span>
+            </span>
+            <div class="flex-1">
+              <h2 id="welcome-title" class="text-lg font-extrabold tracking-tight">
+                {{ practiceName() }} hazır
+              </h2>
+              <p class="text-sm text-slate-600 dark:text-slate-300">
+                Hesabınız boş bir muayenehaneyle açıldı.
+                @if (subs.state(); as sub) {
+                  @if (sub.trialing) {
+                    {{ sub.daysLeft }} gün boyunca Profesyonel paketin tüm özelliklerini ücretsiz
+                    kullanabilirsiniz.
+                  }
+                }
+              </p>
+            </div>
+            @if (subs.state()?.trialing) {
+              <a routerLink="/billing" class="odv-btn-secondary shrink-0">
+                <span class="material-symbols-rounded !text-lg">workspace_premium</span>Paketleri
+                gör
+              </a>
+            }
+          </div>
+          <ol class="grid gap-px bg-slate-100 dark:bg-slate-800 sm:grid-cols-3">
+            @for (step of onboarding; track step.title; let i = $index) {
+              <li class="flex gap-3 bg-white p-5 dark:bg-slate-900">
+                <span
+                  class="tabular grid size-7 shrink-0 place-items-center rounded-full bg-violet-100 text-xs font-extrabold text-violet-700 dark:bg-violet-500/20 dark:text-violet-200"
+                  >{{ i + 1 }}</span
+                >
+                <div>
+                  <strong class="block text-sm">{{ step.title }}</strong>
+                  <span class="text-xs text-slate-500">{{ step.body }}</span>
+                  @if (i === 0) {
+                    <button
+                      type="button"
+                      class="odv-btn-primary mt-3 !min-h-9 text-xs"
+                      (click)="qa.open('client-new')"
+                    >
+                      <span class="material-symbols-rounded !text-base">person_add</span>Danışan
+                      ekle
+                    </button>
+                  }
+                </div>
+              </li>
+            }
+          </ol>
+        </section>
+      }
 
       <section
         class="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4"
@@ -286,6 +348,16 @@ export class OverviewPage {
   readonly store = inject(DietStore);
   readonly qa = inject(QuickActions);
   private readonly auth = inject(AuthStore);
+  readonly subs = inject(SubscriptionStore);
+  readonly onboarding = [
+    { title: 'İlk danışanınızı ekleyin', body: 'Boy, kilo ve hedefle danışan kartını oluşturun.' },
+    { title: 'Beslenme planı hazırlayın', body: 'Kalori ve makroları öğünlere dağıtın.' },
+    {
+      title: 'Danışanı portala davet edin',
+      body: 'Mesaj, görev ve ölçümleri danışanınızla paylaşın.',
+    },
+  ];
+  readonly practiceName = computed(() => this.auth.session()?.practice?.trim() || 'Muayenehaneniz');
   readonly today = new Date();
   readonly channelIcons = CHANNEL_ICONS;
   readonly channelLabels = CHANNEL_LABELS;

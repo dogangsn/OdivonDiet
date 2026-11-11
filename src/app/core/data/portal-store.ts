@@ -1,4 +1,4 @@
-import { Injectable, computed, inject, signal } from '@angular/core';
+import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
 import { partitionAttachments } from '../../domain/attachment-rules';
 import { isoDate } from '../../domain/diet-calc';
 import { Client } from '../../domain/diet.models';
@@ -19,6 +19,34 @@ import {
 } from '../../domain/portal.models';
 import { DietStore } from './diet-store';
 import { createPortalSeed } from './portal-seed';
+import { SAMPLE_WORKSPACE, loadWorkspacePart, saveWorkspacePart } from './workspace';
+
+export interface PortalData {
+  readonly access: PortalAccess[];
+  readonly messages: Message[];
+  readonly tasks: CareTask[];
+  readonly requests: MemberRequest[];
+  readonly readMarkers: ReadMarker[];
+}
+
+export function emptyPortalData(): PortalData {
+  return { access: [], messages: [], tasks: [], requests: [], readMarkers: [] };
+}
+
+/** Login lookup without Firebase: an invited or active client whose e-mail matches. */
+export function memberClientId(
+  email: string,
+  clients: readonly Client[],
+  access: readonly PortalAccess[],
+): string | undefined {
+  const normalized = email.trim().toLocaleLowerCase('tr');
+  const client = clients.find(
+    (c) => c.email.toLocaleLowerCase('tr') === normalized && c.status !== 'archived',
+  );
+  if (!client) return undefined;
+  const status = access.find((a) => a.clientId === client.id)?.status;
+  return status === 'active' || status === 'invited' ? client.id : undefined;
+}
 
 export interface ConversationSummary {
   readonly clientId: string;
@@ -56,12 +84,47 @@ export interface NewRequest {
 @Injectable({ providedIn: 'root' })
 export class PortalStore {
   private readonly diet = inject(DietStore);
-  private readonly seed = createPortalSeed(new Date());
-  readonly access = signal<PortalAccess[]>(this.seed.access);
-  readonly messages = signal<Message[]>(this.seed.messages);
-  readonly tasks = signal<CareTask[]>(this.seed.tasks);
-  readonly requests = signal<MemberRequest[]>(this.seed.requests);
-  readonly readMarkers = signal<ReadMarker[]>(this.seed.readMarkers);
+  private loadedWorkspace: string | null = null;
+  readonly access = signal<PortalAccess[]>([]);
+  readonly messages = signal<Message[]>([]);
+  readonly tasks = signal<CareTask[]>([]);
+  readonly requests = signal<MemberRequest[]>([]);
+  readonly readMarkers = signal<ReadMarker[]>([]);
+
+  constructor() {
+    this.useWorkspace(untracked(this.diet.workspace));
+    effect(() => {
+      const key = this.diet.workspace();
+      untracked(() => this.useWorkspace(key));
+    });
+    effect(() => {
+      const data: PortalData = {
+        access: this.access(),
+        messages: this.messages(),
+        tasks: this.tasks(),
+        requests: this.requests(),
+        readMarkers: this.readMarkers(),
+      };
+      const key = this.loadedWorkspace;
+      if (key) saveWorkspacePart(key, 'portal', data);
+    });
+  }
+
+  /** Loads a workspace's portal records (no-op when it is already loaded). */
+  useWorkspace(key: string): void {
+    if (key === this.loadedWorkspace) return;
+    this.loadedWorkspace = key;
+    const data =
+      key === SAMPLE_WORKSPACE
+        ? createPortalSeed(new Date())
+        : (loadWorkspacePart<PortalData>(key, 'portal') ?? emptyPortalData());
+    const empty = emptyPortalData();
+    this.access.set(data.access ?? empty.access);
+    this.messages.set(data.messages ?? empty.messages);
+    this.tasks.set(data.tasks ?? empty.tasks);
+    this.requests.set(data.requests ?? empty.requests);
+    this.readMarkers.set(data.readMarkers ?? empty.readMarkers);
+  }
 
   /** Every client the dietitian can chat with, newest conversation first. */
   readonly conversations = computed<ConversationSummary[]>(() => {
@@ -145,13 +208,7 @@ export class PortalStore {
 
   /** Demo-mode lookup: an invited or active client whose e-mail matches the login. */
   clientIdForLogin(email: string, clients: readonly Client[]): string | undefined {
-    const normalized = email.trim().toLocaleLowerCase('tr');
-    const client = clients.find(
-      (c) => c.email.toLocaleLowerCase('tr') === normalized && c.status !== 'archived',
-    );
-    if (!client) return undefined;
-    const status = this.accessFor(client.id).status;
-    return status === 'active' || status === 'invited' ? client.id : undefined;
+    return memberClientId(email, clients, this.access());
   }
 
   demoMemberId(): string {

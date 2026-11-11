@@ -77,7 +77,7 @@ const NAV: readonly PortalNavItem[] = [
           </ul>
         </nav>
         <div class="border-t border-slate-100 p-3 dark:border-slate-800">
-          @if (auth.session()?.demo) {
+          @if (auth.session()?.sample) {
             <div
               class="mb-2 flex items-center gap-2 rounded-xl bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-700 dark:bg-amber-950/50 dark:text-amber-300"
             >

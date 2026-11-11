@@ -1,6 +1,7 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { AuthStore } from '../core/auth/auth-store';
+import { SubscriptionStore } from '../core/billing/subscription-store';
 import { DietStore } from '../core/data/diet-store';
 import { PortalStore } from '../core/data/portal-store';
 import { I18nStore, SupportedLang } from '../core/i18n/i18n';
@@ -103,13 +104,46 @@ import { VersionBadge } from '../shared/ui/version-badge';
         </nav>
 
         <div class="border-t border-slate-100 p-3 dark:border-slate-800">
-          @if (auth.session()?.demo) {
+          @if (subs.isSample()) {
             <div
               class="mb-2 flex items-center gap-2 rounded-xl bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-700 dark:bg-amber-950/50 dark:text-amber-300"
             >
-              <span class="material-symbols-rounded !text-base">science</span>Demo modu · veriler
-              kaydedilmez
+              <span class="material-symbols-rounded !text-base">science</span>Demo hesabı · örnek
+              veriler
             </div>
+          } @else if (subs.state(); as s) {
+            <a
+              routerLink="/billing"
+              class="mb-2 block rounded-xl px-3 py-2.5 text-[11px] font-semibold transition"
+              [class]="trialPillClass()"
+              (click)="mobileOpen.set(false)"
+            >
+              <span class="flex items-center gap-2">
+                <span class="material-symbols-rounded !text-base" aria-hidden="true">{{
+                  s.expired ? 'lock_clock' : s.trialing ? 'hourglass_top' : 'workspace_premium'
+                }}</span>
+                <span class="flex-1">
+                  @if (s.expired) {
+                    Süre doldu · paket seçin
+                  } @else if (s.trialing) {
+                    Deneme · {{ s.daysLeft }} gün kaldı
+                  } @else {
+                    {{ s.plan.name }} paketi
+                  }
+                </span>
+                @if (s.trialing) {
+                  <span class="font-bold underline">Yükselt</span>
+                }
+              </span>
+              @if (s.trialing) {
+                <span class="mt-2 block h-1 overflow-hidden rounded-full bg-black/5 dark:bg-white/10">
+                  <span
+                    class="block h-full rounded-full bg-current"
+                    [style.width.%]="s.trialUsedPct"
+                  ></span>
+                </span>
+              }
+            </a>
           }
           <div class="flex items-center gap-3 rounded-xl p-2">
             <app-avatar [name]="auth.session()?.name ?? '?'" size="sm" />
@@ -206,6 +240,7 @@ export class AppShell {
   readonly product = PRODUCT;
   readonly navigation = PRODUCT_NAVIGATION;
   readonly auth = inject(AuthStore);
+  readonly subs = inject(SubscriptionStore);
   readonly i18n = inject(I18nStore);
   readonly theme = inject(ThemeStore);
   readonly qa = inject(QuickActions);
@@ -213,6 +248,16 @@ export class AppShell {
   private readonly portal = inject(PortalStore);
   private readonly router = inject(Router);
   readonly mobileOpen = signal(false);
+
+  readonly trialPillClass = computed(() => {
+    const s = this.subs.state();
+    if (s?.expired) return 'bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300';
+    if (s?.trialing && s.daysLeft <= 3)
+      return 'bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300';
+    if (s?.trialing)
+      return 'bg-violet-50 text-violet-700 hover:bg-violet-100 dark:bg-violet-500/15 dark:text-violet-200';
+    return 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300';
+  });
 
   readonly userSubtitle = computed(() => {
     const s = this.auth.session();

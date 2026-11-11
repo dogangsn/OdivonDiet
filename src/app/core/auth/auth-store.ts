@@ -1,5 +1,6 @@
 import { Injectable, Injector, computed, inject, signal } from '@angular/core';
 import type { UserRole } from '../../domain/portal.models';
+import { SAMPLE_WORKSPACE } from '../data/workspace';
 import { FirebaseIdentity } from './firebase-identity';
 
 export interface AppSession {
@@ -11,6 +12,10 @@ export interface AppSession {
   readonly role?: UserRole;
   /** Only for members: the client record this login belongs to. */
   readonly clientId?: string;
+  /** The demo account with sample data. Real accounts start with an empty practice. */
+  readonly sample?: boolean;
+  /** Only for members without Firebase: the dietitian workspace the client belongs to. */
+  readonly workspace?: string;
 }
 
 /** Thrown when a login exists but is not allowed into the chosen area. */
@@ -77,6 +82,7 @@ export class AuthStore {
         name: email.split('@')[0] || 'Odivon Kullanıcısı',
         email,
         demo: true,
+        sample: false,
         role: 'dietitian',
       });
       return;
@@ -102,6 +108,7 @@ export class AuthStore {
       name: user.displayName || email.split('@')[0],
       email,
       demo: false,
+      sample: false,
       role: 'dietitian',
     });
   }
@@ -111,10 +118,11 @@ export class AuthStore {
    * sets when the dietitian invites the client; in demo mode it is matched by e-mail.
    */
   async signInMember(email: string, password: string): Promise<void> {
-    const { diet, portal } = await this.stores();
+    const { diet, portal, findLocalMember } = await this.stores();
     let clientId: string | undefined;
     let name = '';
     let demo = true;
+    let workspace: string = SAMPLE_WORKSPACE;
     if (this.identity.configured) {
       const user = await this.identity.signIn(email, password);
       const claims = await this.identity.claims();
@@ -126,20 +134,26 @@ export class AuthStore {
       name = user.displayName ?? '';
       demo = false;
     } else {
-      clientId = portal.clientIdForLogin(email, diet.clients());
-      if (!clientId) {
+      const found = findLocalMember(email);
+      if (!found) {
         throw new PortalAccessError(
           'Bu e-posta için portal erişimi bulunamadı. Diyetisyeninizden davet isteyin.',
         );
       }
+      ({ clientId, workspace } = found);
     }
+    const sample = workspace === SAMPLE_WORKSPACE && demo;
+    diet.useWorkspace(workspace);
+    portal.useWorkspace(workspace);
     portal.markActivated(clientId);
     this.persist({
       name: name || diet.clientName(clientId),
       email,
       demo,
+      sample,
       role: 'member',
       clientId,
+      ...(sample || !demo ? {} : { workspace }),
     });
   }
 
@@ -256,12 +270,15 @@ export class AuthStore {
       demo: true,
       practice: 'Odivon Demo Kliniği',
       role: 'dietitian',
+      sample: true,
     });
   }
 
   /** Demo member login as the first client with portal access (Elif Kaya in the seed). */
   async continueMemberDemo(): Promise<void> {
     const { diet, portal } = await this.stores();
+    diet.useWorkspace(SAMPLE_WORKSPACE);
+    portal.useWorkspace(SAMPLE_WORKSPACE);
     const clientId = portal.demoMemberId();
     const client = diet.clients().find((c) => c.id === clientId);
     if (!client) return;
@@ -270,6 +287,7 @@ export class AuthStore {
       name: `${client.firstName} ${client.lastName}`,
       email: client.email,
       demo: true,
+      sample: true,
       role: 'member',
       clientId,
     });
@@ -283,11 +301,16 @@ export class AuthStore {
 
   /** Loaded on demand so the data stores and demo seed stay out of the login bundle. */
   private async stores() {
-    const [{ DietStore }, { PortalStore }] = await Promise.all([
+    const [{ DietStore }, { PortalStore }, { findLocalMember }] = await Promise.all([
       import('../data/diet-store'),
       import('../data/portal-store'),
+      import('../data/local-member'),
     ]);
-    return { diet: this.injector.get(DietStore), portal: this.injector.get(PortalStore) };
+    return {
+      diet: this.injector.get(DietStore),
+      portal: this.injector.get(PortalStore),
+      findLocalMember,
+    };
   }
 
   private activate(pending: PendingVerification): void {
@@ -298,6 +321,7 @@ export class AuthStore {
       demo: pending.demo,
       practice: pending.practice,
       role: 'dietitian',
+      sample: false,
     });
   }
 

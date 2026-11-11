@@ -1,4 +1,4 @@
-import { Injectable, computed, signal } from '@angular/core';
+import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
 import {
   ageFrom,
   bmi,
@@ -22,7 +22,27 @@ import {
   PlanStatus,
   Tone,
 } from '../../domain/diet.models';
+import { AuthStore } from '../auth/auth-store';
 import { createSeed } from './diet-seed';
+import {
+  SAMPLE_WORKSPACE,
+  loadWorkspacePart,
+  saveWorkspacePart,
+  workspaceKeyFor,
+} from './workspace';
+
+export interface DietData {
+  readonly clients: Client[];
+  readonly measurements: Measurement[];
+  readonly plans: MealPlan[];
+  readonly consultations: Consultation[];
+  readonly activity: ActivityEntry[];
+}
+
+/** A brand-new practice starts with no records at all. */
+export function emptyDietData(): DietData {
+  return { clients: [], measurements: [], plans: [], consultations: [], activity: [] };
+}
 
 export interface ClientView {
   readonly client: Client;
@@ -57,17 +77,57 @@ export const MEASUREMENT_OVERDUE_DAYS = 14;
  * Single source of truth for the dietitian workspace.
  *
  * Every page reads from these signals, so a record created on one page shows up
- * everywhere. Data is in memory for now; the mutation methods are the seam where
- * MainAPI (`/api/v1/diet`) calls will go.
+ * everywhere. Only the demo account sees the sample seed; a registered practice starts
+ * empty and its records are kept per account in local storage until MainAPI
+ * (`/api/v1/diet`) is wired in. The mutation methods are the seam for those calls.
  */
 @Injectable({ providedIn: 'root' })
 export class DietStore {
-  private readonly seed = createSeed(new Date());
-  readonly clients = signal<Client[]>(this.seed.clients);
-  readonly measurements = signal<Measurement[]>(this.seed.measurements);
-  readonly plans = signal<MealPlan[]>(this.seed.plans);
-  readonly consultations = signal<Consultation[]>(this.seed.consultations);
-  readonly activity = signal<ActivityEntry[]>(this.seed.activity);
+  private readonly auth = inject(AuthStore);
+  readonly workspace = computed(() => workspaceKeyFor(this.auth.session()));
+  private loadedWorkspace: string | null = null;
+  readonly clients = signal<Client[]>([]);
+  readonly measurements = signal<Measurement[]>([]);
+  readonly plans = signal<MealPlan[]>([]);
+  readonly consultations = signal<Consultation[]>([]);
+  readonly activity = signal<ActivityEntry[]>([]);
+  /** True for the demo account, whose sample data is never saved. */
+  readonly isSample = computed(() => this.workspace() === SAMPLE_WORKSPACE);
+
+  constructor() {
+    this.useWorkspace(untracked(this.workspace));
+    effect(() => {
+      const key = this.workspace();
+      untracked(() => this.useWorkspace(key));
+    });
+    effect(() => {
+      const data: DietData = {
+        clients: this.clients(),
+        measurements: this.measurements(),
+        plans: this.plans(),
+        consultations: this.consultations(),
+        activity: this.activity(),
+      };
+      const key = this.loadedWorkspace;
+      if (key) saveWorkspacePart(key, 'diet', data);
+    });
+  }
+
+  /** Loads a workspace's records (no-op when it is already loaded). */
+  useWorkspace(key: string): void {
+    if (key === this.loadedWorkspace) return;
+    this.loadedWorkspace = key;
+    const data =
+      key === SAMPLE_WORKSPACE
+        ? createSeed(new Date())
+        : (loadWorkspacePart<DietData>(key, 'diet') ?? emptyDietData());
+    const empty = emptyDietData();
+    this.clients.set(data.clients ?? empty.clients);
+    this.measurements.set(data.measurements ?? empty.measurements);
+    this.plans.set(data.plans ?? empty.plans);
+    this.consultations.set(data.consultations ?? empty.consultations);
+    this.activity.set(data.activity ?? empty.activity);
+  }
 
   readonly clientViews = computed<ClientView[]>(() => {
     const now = new Date();
