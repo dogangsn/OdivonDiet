@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, DestroyRef, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { email, FormField, form, minLength, required, submit } from '@angular/forms/signals';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -304,35 +304,130 @@ const MEMBER_PROFILES: readonly DemoMemberProfile[] = [
 
         <div class="relative flex flex-1 items-center justify-center px-5 py-8 sm:px-8 lg:py-4">
           <div class="w-full max-w-[28rem] animate-fade-up">
-            @if (!isRegister) {
-              <nav
-                class="mb-6 grid grid-cols-2 rounded-xl border border-slate-200 bg-white p-1 text-sm font-bold shadow-sm dark:border-slate-800 dark:bg-slate-900"
-                aria-label="Giriş türü"
+            @if (isVerify) {
+              <span
+                class="grid size-14 place-items-center rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 text-white shadow-lg shadow-violet-500/30"
               >
-                <a
-                  routerLink="/login"
-                  class="flex items-center justify-center gap-1.5 rounded-lg py-2 transition-colors"
-                  [class]="
-                    isMember
-                      ? 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white'
-                      : 'bg-violet-50 text-violet-700 dark:bg-violet-500/15 dark:text-violet-200'
-                  "
-                  [attr.aria-current]="isMember ? null : 'page'"
-                  ><span class="material-symbols-rounded !text-lg" aria-hidden="true"
-                    >stethoscope</span
-                  >Diyetisyen / Uzman</a
+                <span class="material-symbols-rounded icon-fill !text-3xl" aria-hidden="true">{{
+                  linkState() === 'done' ? 'mark_email_read' : 'mark_email_unread'
+                }}</span>
+              </span>
+              <h2 class="mt-6 text-[1.75rem] font-extrabold leading-tight tracking-tight">
+                {{ linkState() === 'done' ? 'E-postanız doğrulandı' : 'E-postanızı doğrulayın' }}
+              </h2>
+              @if (linkState() === 'checking') {
+                <p class="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400" role="status">
+                  Doğrulama bağlantınız kontrol ediliyor…
+                </p>
+              } @else if (linkState() === 'done') {
+                <p class="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400" role="status">
+                  Hesabınız etkinleştirildi. Devam etmek için giriş yapın.
+                </p>
+                <a class="odv-btn-primary !min-h-12 mt-8 w-full !text-sm" routerLink="/login"
+                  >Giriş yap</a
                 >
-                <a
-                  routerLink="/portal/login"
-                  class="flex items-center justify-center gap-1.5 rounded-lg py-2 transition-colors"
-                  [class]="
-                    isMember
-                      ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200'
-                      : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white'
-                  "
-                  [attr.aria-current]="isMember ? 'page' : null"
-                  ><span class="material-symbols-rounded !text-lg" aria-hidden="true">favorite</span
-                  >Danışan Portalı</a
+              } @else if (pending(); as p) {
+                <p class="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
+                  <strong class="text-slate-800 dark:text-white">{{ p.email }}</strong>
+                  adresine
+                  {{
+                    p.demo
+                      ? '6 haneli bir doğrulama kodu gönderdik. Hesabınız kod girilene kadar etkin olmaz.'
+                      : 'bir doğrulama bağlantısı gönderdik. Bağlantıya tıklayana kadar hesabınız etkin olmaz.'
+                  }}
+                </p>
+
+                @if (p.demo) {
+                  <div
+                    class="mt-6 flex items-start gap-2.5 rounded-xl border border-violet-200 bg-violet-50 p-3 text-xs leading-5 text-violet-800 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-200"
+                  >
+                    <span class="material-symbols-rounded !text-base" aria-hidden="true">info</span>
+                    <span
+                      >Demo modunda gerçek e-posta gönderilmez. Doğrulama kodunuz:
+                      <strong class="font-mono text-sm tracking-[.2em]">{{ p.code }}</strong></span
+                    >
+                  </div>
+                  <form class="mt-6 space-y-4" (submit)="onVerifyCode($event)" novalidate>
+                    <label class="block">
+                      <span class="odv-label">Doğrulama kodu</span>
+                      <input
+                        class="odv-input !py-3 text-center font-mono !text-lg tracking-[.5em]"
+                        inputmode="numeric"
+                        autocomplete="one-time-code"
+                        maxlength="6"
+                        placeholder="••••••"
+                        [value]="code()"
+                        (input)="onCodeInput($event)"
+                      />
+                    </label>
+                    @if (error()) {
+                      <div role="alert" class="odv-auth-alert">
+                        <span class="material-symbols-rounded !text-base" aria-hidden="true"
+                          >error</span
+                        >
+                        {{ error() }}
+                      </div>
+                    }
+                    <button
+                      class="odv-btn-primary !min-h-12 w-full !text-sm"
+                      type="submit"
+                      [disabled]="code().length !== 6"
+                    >
+                      Doğrula ve devam et
+                    </button>
+                  </form>
+                } @else {
+                  <ol
+                    class="mt-6 space-y-2.5 rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
+                  >
+                    <li class="flex gap-2.5">
+                      <span
+                        class="material-symbols-rounded !text-lg text-violet-500"
+                        aria-hidden="true"
+                        >inbox</span
+                      >
+                      Gelen kutunuzu (ve gereksiz klasörünü) açın.
+                    </li>
+                    <li class="flex gap-2.5">
+                      <span
+                        class="material-symbols-rounded !text-lg text-violet-500"
+                        aria-hidden="true"
+                        >link</span
+                      >
+                      OdivonDiet doğrulama bağlantısına tıklayın.
+                    </li>
+                    <li class="flex gap-2.5">
+                      <span
+                        class="material-symbols-rounded !text-lg text-violet-500"
+                        aria-hidden="true"
+                        >task_alt</span
+                      >
+                      Bu sayfaya dönüp devam edin.
+                    </li>
+                  </ol>
+                  @if (error()) {
+                    <div role="alert" class="odv-auth-alert mt-4">
+                      <span class="material-symbols-rounded !text-base" aria-hidden="true"
+                        >error</span
+                      >
+                      {{ error() }}
+                    </div>
+                  }
+                  <button
+                    class="odv-btn-primary !min-h-12 mt-6 w-full !text-sm"
+                    type="button"
+                    [disabled]="busy()"
+                    (click)="onConfirmVerified()"
+                  >
+                    {{ busy() ? 'Kontrol ediliyor…' : 'Doğruladım, devam et' }}
+                  </button>
+                }
+
+                <button
+                  type="button"
+                  class="odv-btn-secondary !min-h-12 mt-3 w-full !text-sm dark:!border-slate-800 dark:!bg-slate-900 dark:hover:!bg-slate-800"
+                  [disabled]="resendWait() > 0 || busy()"
+                  (click)="onResend()"
                 >
                   <span class="material-symbols-rounded !text-lg text-violet-500" aria-hidden="true"
                     >forward_to_inbox</span
@@ -375,7 +470,7 @@ const MEMBER_PROFILES: readonly DemoMemberProfile[] = [
             } @else {
               @if (!isRegister) {
                 <nav
-                  class="mb-8 grid grid-cols-2 rounded-xl border border-slate-200 bg-white p-1 text-sm font-bold shadow-sm dark:border-slate-800 dark:bg-slate-900"
+                  class="mb-6 grid grid-cols-2 rounded-xl border border-slate-200 bg-white p-1 text-sm font-bold shadow-sm dark:border-slate-800 dark:bg-slate-900"
                   aria-label="Giriş türü"
                 >
                   <a
@@ -389,7 +484,7 @@ const MEMBER_PROFILES: readonly DemoMemberProfile[] = [
                     [attr.aria-current]="isMember ? null : 'page'"
                     ><span class="material-symbols-rounded !text-lg" aria-hidden="true"
                       >stethoscope</span
-                    >Diyetisyen</a
+                    >Diyetisyen / Uzman</a
                   >
                   <a
                     routerLink="/portal/login"
@@ -402,70 +497,186 @@ const MEMBER_PROFILES: readonly DemoMemberProfile[] = [
                     [attr.aria-current]="isMember ? 'page' : null"
                     ><span class="material-symbols-rounded !text-lg" aria-hidden="true"
                       >favorite</span
-                    >Danışan</a
+                    >Danışan Portalı</a
                   >
                 </nav>
               }
 
-              <h2 class="text-[1.75rem] font-extrabold leading-tight tracking-tight">
+              <h2 class="text-[1.65rem] font-extrabold leading-tight tracking-tight">
                 {{
                   isRegister
-                    ? 'Hesabınızı oluşturun'
+                    ? 'Klinik uzman hesabınızı oluşturun'
                     : isMember
-                      ? 'Danışan portalına hoş geldiniz'
-                      : 'Tekrar hoş geldiniz'
+                      ? 'Danışan Beslenme & Takip Portalı'
+                      : 'Diyetisyen Klinik Çalışma Alanı'
                 }}
               </h2>
-              <p class="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
+              <p class="mt-1.5 text-sm leading-6 text-slate-500 dark:text-slate-400">
                 {{
                   isRegister
-                    ? 'Muayenehanenizi birkaç dakikada dijitale taşıyın.'
+                    ? 'Uzmanlık branşınızı, sicil bilginizi ve muayenehanenizi tanımlayarak başlayın.'
                     : isMember
-                      ? 'Planınızı, ölçümlerinizi ve diyetisyeninizle mesajlarınızı görün.'
-                      : 'Klinik çalışma alanınıza güvenli erişim sağlayın.'
+                      ? 'Günlük öğün programınızı, kalori/makro dağılımınızı, ölçümlerinizi ve uzman mesajlarınızı takip edin.'
+                      : 'Danışan antropometrisi, besin kütüphanesi ve kalori hesaplamalı diyet stüdyosuna erişin.'
                 }}
               </p>
 
-              <form class="mt-8 space-y-4" (submit)="onSubmit($event)" novalidate>
+              <form class="mt-6 space-y-3.5" (submit)="onSubmit($event)" novalidate>
                 @if (isRegister) {
-                  <label class="block">
-                    <span class="odv-label">Ad soyad</span>
-                    <span class="relative block">
-                      <span
-                        class="material-symbols-rounded pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 !text-lg text-slate-400"
-                        aria-hidden="true"
-                        >person</span
+                  <div class="grid gap-3 sm:grid-cols-[9rem_1fr]">
+                    <label class="block">
+                      <span class="odv-label">Unvan</span>
+                      <select
+                        class="odv-input !py-2.5"
+                        [ngModel]="specialistTitle()"
+                        (ngModelChange)="specialistTitle.set($event)"
+                        [ngModelOptions]="{ standalone: true }"
                       >
-                      <input
-                        class="odv-input !py-3 ps-10"
-                        [formField]="authForm.name"
-                        autocomplete="name"
-                        placeholder="Dyt. Ad Soyad"
-                      />
-                    </span>
-                    @if (authForm.name().touched() && authForm.name().invalid()) {
-                      <span class="odv-error">Ad soyad zorunludur.</span>
-                    }
-                  </label>
-                  <label class="block">
-                    <span class="odv-label">Muayenehane / klinik adı</span>
-                    <span class="relative block">
-                      <span
-                        class="material-symbols-rounded pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 !text-lg text-slate-400"
-                        aria-hidden="true"
-                        >apartment</span
+                        <option value="Dyt.">Dyt.</option>
+                        <option value="Uzm. Dyt.">Uzm. Dyt.</option>
+                        <option value="Dr. Dyt.">Dr. Dyt.</option>
+                        <option value="Doç. Dr.">Doç. Dr.</option>
+                        <option value="Prof. Dr.">Prof. Dr.</option>
+                      </select>
+                    </label>
+                    <label class="block">
+                      <span class="odv-label">Ad soyad</span>
+                      <span class="relative block">
+                        <span
+                          class="material-symbols-rounded pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 !text-lg text-slate-400"
+                          aria-hidden="true"
+                          >person</span
+                        >
+                        <input
+                          class="odv-input !py-2.5 ps-10"
+                          [formField]="authForm.name"
+                          autocomplete="name"
+                          placeholder="Deniz Arslan"
+                        />
+                      </span>
+                      @if (authForm.name().touched() && authForm.name().invalid()) {
+                        <span class="odv-error">Ad soyad zorunludur.</span>
+                      }
+                    </label>
+                  </div>
+
+                  <div class="grid gap-3 sm:grid-cols-2">
+                    <label class="block">
+                      <span class="odv-label">Klinik uzmanlık branşı</span>
+                      <select
+                        class="odv-input !py-2.5"
+                        [ngModel]="specialty()"
+                        (ngModelChange)="specialty.set($event)"
+                        [ngModelOptions]="{ standalone: true }"
                       >
+                        <option value="Obezite & Metabolik Beslenme">
+                          Obezite & Metabolik Beslenme
+                        </option>
+                        <option value="Sporcu & Performans Beslenmesi">
+                          Sporcu & Performans Beslenmesi
+                        </option>
+                        <option value="Endokrin & Diyabet Beslenmesi">
+                          Endokrin & Diyabet Beslenmesi
+                        </option>
+                        <option value="Gastroenteroloji & Eliminasyon">
+                          Gastroenteroloji & Eliminasyon
+                        </option>
+                        <option value="Anne-Çocuk & Gebelik Beslenmesi">
+                          Anne-Çocuk & Gebelik Beslenmesi
+                        </option>
+                      </select>
+                    </label>
+                    <label class="block">
+                      <span class="odv-label">TDD / Bakanlık Sicil No</span>
                       <input
-                        class="odv-input !py-3 ps-10"
-                        [formField]="authForm.company"
-                        autocomplete="organization"
-                        placeholder="İsteğe bağlı"
+                        class="odv-input !py-2.5"
+                        [ngModel]="licenseNo()"
+                        (ngModelChange)="licenseNo.set($event)"
+                        [ngModelOptions]="{ standalone: true }"
+                        placeholder="TR-DYT-10482"
                       />
-                    </span>
-                  </label>
+                    </label>
+                  </div>
+
+                  <div class="grid gap-3 sm:grid-cols-2">
+                    <label class="block">
+                      <span class="odv-label">Muayenehane / klinik adı</span>
+                      <span class="relative block">
+                        <span
+                          class="material-symbols-rounded pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 !text-lg text-slate-400"
+                          aria-hidden="true"
+                          >apartment</span
+                        >
+                        <input
+                          class="odv-input !py-2.5 ps-10"
+                          [formField]="authForm.company"
+                          autocomplete="organization"
+                          placeholder="Örn. Nişantaşı Beslenme Kliniği"
+                        />
+                      </span>
+                    </label>
+                    <label class="block">
+                      <span class="odv-label">Çalışma modeli</span>
+                      <select
+                        class="odv-input !py-2.5"
+                        [ngModel]="workspaceMode()"
+                        (ngModelChange)="workspaceMode.set($event)"
+                        [ngModelOptions]="{ standalone: true }"
+                      >
+                        <option value="Klinik + Online Hibrit">Klinik + Online Hibrit</option>
+                        <option value="Yüz Yüze Muayenehane">Yüz Yüze Muayenehane</option>
+                        <option value="Online Beslenme Danışmanlığı">
+                          Online Beslenme Danışmanlığı
+                        </option>
+                        <option value="Hastane / Tıp Merkezi Polikliniği">
+                          Hastane / Tıp Merkezi Polikliniği
+                        </option>
+                      </select>
+                    </label>
+                  </div>
                 }
+
+                @if (!isRegister && !isMember) {
+                  <div class="grid gap-3 sm:grid-cols-2">
+                    <label class="block">
+                      <span class="odv-label">Aktif klinik birim / branş</span>
+                      <select
+                        class="odv-input !py-2.5 text-xs"
+                        [ngModel]="specialty()"
+                        (ngModelChange)="specialty.set($event)"
+                        [ngModelOptions]="{ standalone: true }"
+                      >
+                        <option value="Obezite & Metabolik Beslenme">
+                          Obezite & Metabolik Beslenme
+                        </option>
+                        <option value="Sporcu & Performans Beslenmesi">
+                          Sporcu & Performans Beslenmesi
+                        </option>
+                        <option value="Endokrin, Diyabet & İnsülin Direnci">
+                          Endokrin, Diyabet & İnsülin Direnci
+                        </option>
+                        <option value="Bariatrik Cerrahi Beslenmesi">
+                          Bariatrik Cerrahi Beslenmesi
+                        </option>
+                      </select>
+                    </label>
+                    <label class="block">
+                      <span class="odv-label">Uzman Sicil / Oda No (İsteğe bağlı)</span>
+                      <input
+                        class="odv-input !py-2.5 text-xs"
+                        [ngModel]="licenseNo()"
+                        (ngModelChange)="licenseNo.set($event)"
+                        [ngModelOptions]="{ standalone: true }"
+                        placeholder="TR-DYT-10482"
+                      />
+                    </label>
+                  </div>
+                }
+
                 <label class="block">
-                  <span class="odv-label">E-posta</span>
+                  <span class="odv-label">{{
+                    isMember ? 'Danışan e-posta adresi' : 'Kurumsal / uzman e-posta'
+                  }}</span>
                   <span class="relative block">
                     <span
                       class="material-symbols-rounded pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 !text-lg text-slate-400"
@@ -473,17 +684,18 @@ const MEMBER_PROFILES: readonly DemoMemberProfile[] = [
                       >mail</span
                     >
                     <input
-                      class="odv-input !py-3 ps-10"
+                      class="odv-input !py-2.5 ps-10"
                       type="email"
                       [formField]="authForm.email"
                       autocomplete="email"
-                      placeholder="ornek@klinik.com"
+                      [placeholder]="isMember ? 'elif.kaya@ornek.com' : 'uzman@klinik.com'"
                     />
                   </span>
                   @if (authForm.email().touched() && authForm.email().invalid()) {
                     <span class="odv-error">Geçerli bir e-posta girin.</span>
                   }
                 </label>
+
                 <label class="block">
                   <span class="odv-label">Şifre</span>
                   <span class="relative block">
@@ -492,28 +704,8 @@ const MEMBER_PROFILES: readonly DemoMemberProfile[] = [
                       aria-hidden="true"
                       >lock</span
                     >
-                      <option value="Obezite & Metabolik Beslenme">
-                        Obezite & Metabolik Beslenme
-                      </option>
-                      <option value="Sporcu & Performans Beslenmesi">
-                        Sporcu & Performans Beslenmesi
-                      </option>
-                      <option value="Endokrin & Diyabet Beslenmesi">
-                        Endokrin & Diyabet Beslenmesi
-                      </option>
-                      <option value="Gastroenteroloji & Eliminasyon">
-                        Gastroenteroloji & Eliminasyon
-                      </option>
-                      <option value="Anne-Çocuk & Gebelik Beslenmesi">
-                        Anne-Çocuk & Gebelik Beslenmesi
-                      </option>
-                    </select>
-                  </label>
-
-                  <label class="block">
-                    <span class="odv-label">T.C. Sağlık Bakanlığı / TDD Sicil No</span>
                     <input
-                      class="odv-input !py-3 ps-10 pe-12"
+                      class="odv-input !py-2.5 ps-10 pe-12"
                       [type]="showPassword() ? 'text' : 'password'"
                       [formField]="authForm.password"
                       [autocomplete]="isRegister ? 'new-password' : 'current-password'"
@@ -534,6 +726,7 @@ const MEMBER_PROFILES: readonly DemoMemberProfile[] = [
                     <span class="odv-error">Şifre en az 8 karakter olmalıdır.</span>
                   }
                 </label>
+
                 @if (error()) {
                   <div
                     role="alert"
@@ -545,8 +738,9 @@ const MEMBER_PROFILES: readonly DemoMemberProfile[] = [
                     {{ error() }}
                   </div>
                 }
+
                 <button
-                  class="odv-btn-primary group !min-h-12 w-full !text-sm"
+                  class="odv-btn-primary group !min-h-11 w-full !text-sm"
                   type="submit"
                   [disabled]="busy()"
                 >
@@ -561,14 +755,15 @@ const MEMBER_PROFILES: readonly DemoMemberProfile[] = [
                 </button>
               </form>
 
-              <div class="my-6 flex items-center gap-3 text-xs font-semibold text-slate-400">
-                <span class="h-px flex-1 bg-slate-200 dark:bg-slate-800"></span>veya<span
-                  class="h-px flex-1 bg-slate-200 dark:bg-slate-800"
-                ></span>
+              <div class="my-5 flex items-center gap-3 text-xs font-semibold text-slate-400">
+                <span class="h-px flex-1 bg-slate-200 dark:bg-slate-800"></span>
+                {{ isMember ? 'Hızlı Danışan Profili Seç' : 'Hızlı Klinik Uzman Profili Seç' }}
+                <span class="h-px flex-1 bg-slate-200 dark:bg-slate-800"></span>
               </div>
+
               <button
                 type="button"
-                class="odv-btn-secondary !min-h-12 w-full !text-sm dark:!border-slate-800 dark:!bg-slate-900 dark:hover:!bg-slate-800"
+                class="odv-btn-secondary mb-3 !min-h-11 w-full !text-sm dark:!border-slate-800 dark:!bg-slate-900 dark:hover:!bg-slate-800"
                 (click)="demo()"
               >
                 <span class="material-symbols-rounded !text-lg text-violet-500" aria-hidden="true"
@@ -577,11 +772,63 @@ const MEMBER_PROFILES: readonly DemoMemberProfile[] = [
               </button>
 
               @if (isMember) {
-                <p class="mt-6 text-center text-sm text-slate-500 dark:text-slate-400">
+                <div class="space-y-2">
+                  @for (mp of memberProfiles; track mp.clientId) {
+                    <button
+                      type="button"
+                      class="flex w-full items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-start transition hover:border-emerald-400 hover:bg-emerald-50/40 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-emerald-500/50 dark:hover:bg-emerald-950/20"
+                      (click)="demoMember(mp.clientId)"
+                    >
+                      <div class="min-w-0">
+                        <div class="flex items-center gap-2">
+                          <strong class="text-xs font-bold text-slate-900 dark:text-white">{{
+                            mp.name
+                          }}</strong>
+                          <span class="odv-chip">{{ mp.programLabel }}</span>
+                        </div>
+                        <p class="m-0 mt-0.5 truncate text-[11px] text-slate-500">
+                          {{ mp.metricNote }} · {{ mp.email }}
+                        </p>
+                      </div>
+                      <span
+                        class="material-symbols-rounded shrink-0 !text-lg text-emerald-600"
+                        aria-hidden="true"
+                        >login</span
+                      >
+                    </button>
+                  }
+                </div>
+                <p class="mt-4 text-center text-xs text-slate-500 dark:text-slate-400">
                   Portal hesabınızı diyetisyeniniz açar; davet e-postasındaki adresle giriş yapın.
                 </p>
               } @else {
-                <p class="mt-6 text-center text-sm text-slate-500 dark:text-slate-400">
+                <div class="space-y-2">
+                  @for (sp of specialistProfiles; track sp.id) {
+                    <button
+                      type="button"
+                      class="flex w-full items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-start transition hover:border-violet-400 hover:bg-violet-50/40 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-violet-500/50 dark:hover:bg-violet-950/20"
+                      (click)="demoSpecialist(sp)"
+                    >
+                      <div class="min-w-0">
+                        <div class="flex flex-wrap items-center gap-1.5">
+                          <strong class="text-xs font-bold text-slate-900 dark:text-white">{{
+                            sp.name
+                          }}</strong>
+                          <span class="odv-chip">{{ sp.specialty }}</span>
+                        </div>
+                        <p class="m-0 mt-0.5 truncate text-[11px] text-slate-500">
+                          {{ sp.practice }} · Sicil: {{ sp.licenseNo }}
+                        </p>
+                      </div>
+                      <span
+                        class="material-symbols-rounded shrink-0 !text-lg text-violet-600"
+                        aria-hidden="true"
+                        >clinical_notes</span
+                      >
+                    </button>
+                  }
+                </div>
+                <p class="mt-4 text-center text-xs text-slate-500 dark:text-slate-400">
                   {{ isRegister ? 'Zaten hesabınız var mı?' : 'Henüz hesabınız yok mu?' }}
                   <a
                     class="font-bold text-violet-600 hover:underline dark:text-violet-400"
@@ -737,6 +984,7 @@ export class AuthPage {
     this.notify.success('E-postanız doğrulandı', 'Hesabınız etkinleştirildi.');
     await this.router.navigateByUrl(this.auth.homePath());
   }
+
   onSubmit(event: Event): void {
     event.preventDefault();
     submit(this.authForm, async () => {
@@ -744,10 +992,29 @@ export class AuthPage {
       this.error.set('');
       try {
         const value = this.model();
-        if (this.isRegister)
-          await this.auth.register(value.name, value.email, value.password, value.company.trim());
-        else if (this.isMember) await this.auth.signInMember(value.email, value.password);
-        else await this.auth.signIn(value.email, value.password);
+        if (this.isRegister) {
+          const fullName = value.name.trim().startsWith('Dyt') || value.name.trim().startsWith('Uzm') || value.name.trim().startsWith('Dr') || value.name.trim().startsWith('Doç') || value.name.trim().startsWith('Prof')
+            ? value.name.trim()
+            : `${this.specialistTitle()} ${value.name.trim()}`;
+          await this.auth.register(
+            fullName,
+            value.email,
+            value.password,
+            value.company.trim(),
+            this.specialty(),
+            this.licenseNo().trim(),
+            this.workspaceMode(),
+          );
+        } else if (this.isMember) {
+          await this.auth.signInMember(value.email, value.password);
+        } else {
+          await this.auth.signIn(
+            value.email,
+            value.password,
+            this.specialty(),
+            this.licenseNo().trim(),
+          );
+        }
         await this.router.navigateByUrl(this.isRegister ? '/verify-email' : this.auth.homePath());
       } catch (error) {
         if (error instanceof EmailNotVerifiedError) {

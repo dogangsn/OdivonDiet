@@ -35,6 +35,9 @@ export interface PendingVerification {
   readonly name: string;
   readonly email: string;
   readonly practice: string;
+  readonly specialty?: string;
+  readonly licenseNo?: string;
+  readonly workspaceMode?: string;
   readonly demo: boolean;
   /** Demo mode only: there is no mail server, so the 6-digit code is kept locally. */
   readonly code?: string;
@@ -75,7 +78,12 @@ export class AuthStore {
   });
   readonly homePath = computed(() => HOME_BY_ROLE[this.role() ?? 'dietitian']);
 
-  async signIn(email: string, password: string): Promise<void> {
+  async signIn(
+    email: string,
+    password: string,
+    specialty?: string,
+    licenseNo?: string,
+  ): Promise<void> {
     if (!this.identity.configured) {
       const pending = this.pendingVerification();
       if (pending?.demo && pending.email.toLowerCase() === email.toLowerCase()) {
@@ -86,6 +94,8 @@ export class AuthStore {
         email,
         demo: true,
         sample: false,
+        specialty: specialty || 'Obezite & Metabolik Beslenme',
+        licenseNo: licenseNo || 'TR-DYT-10482',
         role: 'dietitian',
       });
       return;
@@ -102,6 +112,8 @@ export class AuthStore {
         name: user.displayName || email.split('@')[0],
         email,
         practice: '',
+        specialty,
+        licenseNo,
         demo: false,
         sentAt: 0,
       });
@@ -112,6 +124,8 @@ export class AuthStore {
       email,
       demo: false,
       sample: false,
+      specialty,
+      licenseNo,
       role: 'dietitian',
     });
   }
@@ -165,12 +179,23 @@ export class AuthStore {
    * With Firebase the verification link is sent by Firebase Auth; in demo mode there is no
    * mail server, so a 6-digit code is generated locally and shown on the verification screen.
    */
-  async register(name: string, email: string, password: string, practice = ''): Promise<void> {
+  async register(
+    name: string,
+    email: string,
+    password: string,
+    practice = '',
+    specialty?: string,
+    licenseNo?: string,
+    workspaceMode?: string,
+  ): Promise<void> {
     if (!this.identity.configured) {
       this.setPending({
         name,
         email,
         practice,
+        specialty,
+        licenseNo,
+        workspaceMode,
         demo: true,
         code: newCode(),
         expiresAt: Date.now() + CODE_TTL_MS,
@@ -183,9 +208,90 @@ export class AuthStore {
       name: user.displayName || name,
       email,
       practice,
+      specialty,
+      licenseNo,
+      workspaceMode,
       demo: false,
       sentAt: Date.now(),
     });
+  }
+
+  /** Seconds left before another verification e-mail may be requested. */
+  resendWaitSeconds(now = Date.now()): number {
+    const pending = this.pendingVerification();
+    if (!pending) return 0;
+    return Math.max(0, Math.ceil((pending.sentAt + RESEND_COOLDOWN_MS - now) / 1000));
+  }
+
+  async resendVerification(): Promise<void> {
+    const pending = this.pendingVerification();
+    if (!pending) throw new VerificationError('Doğrulama bekleyen bir kayıt yok.');
+    if (this.resendWaitSeconds() > 0) {
+      throw new VerificationError('Yeni e-posta için biraz bekleyin.');
+    }
+    if (pending.demo) {
+      this.setPending({
+        ...pending,
+        code: newCode(),
+        expiresAt: Date.now() + CODE_TTL_MS,
+        sentAt: Date.now(),
+      });
+      return;
+    }
+    await this.identity.sendVerification();
+    this.setPending({ ...pending, sentAt: Date.now() });
+  }
+
+  /** Demo mode: confirms the 6-digit code and activates the account. */
+  verifyCode(code: string): void {
+    const pending = this.pendingVerification();
+    if (!pending?.demo || !pending.code) {
+      throw new VerificationError('Doğrulama bekleyen bir kayıt yok.');
+    }
+    if (!pending.expiresAt || Date.now() > pending.expiresAt) {
+      throw new VerificationError('Kodun süresi doldu. Yeni kod isteyin.');
+    }
+    if (code.trim() !== pending.code) {
+      throw new VerificationError('Kod hatalı. E-postanızdaki 6 haneli kodu girin.');
+    }
+    this.activate(pending);
+  }
+
+  /** Firebase: checks whether the link in the e-mail was opened, then activates the account. */
+  async confirmVerified(): Promise<void> {
+    const pending = this.pendingVerification();
+    if (!pending || pending.demo) throw new VerificationError('Doğrulama bekleyen bir kayıt yok.');
+    if (!(await this.identity.refreshVerified())) {
+      throw new VerificationError(
+        'E-posta henüz doğrulanmadı. Gelen kutunuzdaki bağlantıya tıklayıp tekrar deneyin.',
+      );
+    }
+    this.activate(pending);
+  }
+
+  /**
+   * Firebase: applies a verification link opened in this app. Returns `true` when the account
+   * could be activated straight away, `false` when the user has to sign in (other device).
+   */
+  async applyVerificationLink(oobCode: string): Promise<boolean> {
+    try {
+      await this.identity.applyVerificationLink(oobCode);
+    } catch {
+      throw new VerificationError('Doğrulama bağlantısı geçersiz ya da süresi dolmuş.');
+    }
+    const pending = this.pendingVerification();
+    if (pending && !pending.demo && (await this.identity.refreshVerified())) {
+      this.activate(pending);
+      return true;
+    }
+    return false;
+  }
+
+  /** Drops the unfinished registration (e.g. to use another address). */
+  cancelVerification(): void {
+    const pending = this.pendingVerification();
+    if (pending && !pending.demo) void this.identity.logout();
+    this.setPending(null);
   }
 
   continueDemo(profile?: {
@@ -197,10 +303,10 @@ export class AuthStore {
     workspaceMode?: string;
   }): void {
     this.persist({
-      name: profile?.name ?? 'Uzm. Dyt. Deniz Arslan',
+      name: profile?.name ?? 'Dyt. Deniz Arslan',
       email: profile?.email ?? 'demo@odivon.com',
       demo: true,
-      practice: profile?.practice ?? 'Odivon Klinik Beslenme Merkezi',
+      practice: profile?.practice ?? 'Odivon Demo Kliniği',
       specialty: profile?.specialty ?? 'Obezite & Metabolik Beslenme',
       licenseNo: profile?.licenseNo ?? 'TR-DYT-10482',
       workspaceMode: profile?.workspaceMode ?? 'Klinik + Online Hibrit',
@@ -212,6 +318,8 @@ export class AuthStore {
   /** Demo member login as the selected client (defaults to the first client with portal access, Elif Kaya). */
   async continueMemberDemo(preferredClientId?: string): Promise<void> {
     const { diet, portal } = await this.stores();
+    diet.useWorkspace(SAMPLE_WORKSPACE);
+    portal.useWorkspace(SAMPLE_WORKSPACE);
     const clientId = preferredClientId ?? portal.demoMemberId();
     const client = diet.clients().find((c) => c.id === clientId);
     if (!client) return;
@@ -253,6 +361,9 @@ export class AuthStore {
       email: pending.email,
       demo: pending.demo,
       practice: pending.practice,
+      specialty: pending.specialty,
+      licenseNo: pending.licenseNo,
+      workspaceMode: pending.workspaceMode,
       role: 'dietitian',
       sample: false,
     });

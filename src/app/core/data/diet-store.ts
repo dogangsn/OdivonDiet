@@ -24,7 +24,7 @@ import {
   Tone,
 } from '../../domain/diet.models';
 import { AuthStore } from '../auth/auth-store';
-import { createSeed } from './diet-seed';
+import { createSeed, SEED_FOODS } from './diet-seed';
 import {
   SAMPLE_WORKSPACE,
   loadWorkspacePart,
@@ -38,11 +38,19 @@ export interface DietData {
   readonly plans: MealPlan[];
   readonly consultations: Consultation[];
   readonly activity: ActivityEntry[];
+  readonly foods?: FoodItem[];
 }
 
-/** A brand-new practice starts with no records at all. */
+/** A brand-new practice starts with no client records, plus the clinical food database. */
 export function emptyDietData(): DietData {
-  return { clients: [], measurements: [], plans: [], consultations: [], activity: [] };
+  return {
+    clients: [],
+    measurements: [],
+    plans: [],
+    consultations: [],
+    activity: [],
+    foods: [...SEED_FOODS],
+  };
 }
 
 export interface ClientView {
@@ -84,13 +92,54 @@ export const MEASUREMENT_OVERDUE_DAYS = 14;
  */
 @Injectable({ providedIn: 'root' })
 export class DietStore {
-  private readonly seed = createSeed(new Date());
-  readonly clients = signal<Client[]>(this.seed.clients);
-  readonly measurements = signal<Measurement[]>(this.seed.measurements);
-  readonly plans = signal<MealPlan[]>(this.seed.plans);
-  readonly consultations = signal<Consultation[]>(this.seed.consultations);
-  readonly activity = signal<ActivityEntry[]>(this.seed.activity);
-  readonly foods = signal<FoodItem[]>(this.seed.foods);
+  private readonly auth = inject(AuthStore);
+  readonly workspace = computed(() => workspaceKeyFor(this.auth.session()));
+  private loadedWorkspace: string | null = null;
+  readonly clients = signal<Client[]>([]);
+  readonly measurements = signal<Measurement[]>([]);
+  readonly plans = signal<MealPlan[]>([]);
+  readonly consultations = signal<Consultation[]>([]);
+  readonly activity = signal<ActivityEntry[]>([]);
+  readonly foods = signal<FoodItem[]>([...SEED_FOODS]);
+  /** True for the demo account, whose sample data is never saved. */
+  readonly isSample = computed(() => this.workspace() === SAMPLE_WORKSPACE);
+
+  constructor() {
+    this.useWorkspace(untracked(this.workspace));
+    effect(() => {
+      const key = this.workspace();
+      untracked(() => this.useWorkspace(key));
+    });
+    effect(() => {
+      const data: DietData = {
+        clients: this.clients(),
+        measurements: this.measurements(),
+        plans: this.plans(),
+        consultations: this.consultations(),
+        activity: this.activity(),
+        foods: this.foods(),
+      };
+      const key = this.loadedWorkspace;
+      if (key) saveWorkspacePart(key, 'diet', data);
+    });
+  }
+
+  /** Loads a workspace's records (no-op when it is already loaded). */
+  useWorkspace(key: string): void {
+    if (key === this.loadedWorkspace) return;
+    this.loadedWorkspace = key;
+    const data =
+      key === SAMPLE_WORKSPACE
+        ? createSeed(new Date())
+        : (loadWorkspacePart<DietData>(key, 'diet') ?? emptyDietData());
+    const empty = emptyDietData();
+    this.clients.set(data.clients ?? empty.clients);
+    this.measurements.set(data.measurements ?? empty.measurements);
+    this.plans.set(data.plans ?? empty.plans);
+    this.consultations.set(data.consultations ?? empty.consultations);
+    this.activity.set(data.activity ?? empty.activity);
+    this.foods.set(data.foods?.length ? data.foods : [...SEED_FOODS]);
+  }
 
   readonly clientViews = computed<ClientView[]>(() => {
     const now = new Date();
