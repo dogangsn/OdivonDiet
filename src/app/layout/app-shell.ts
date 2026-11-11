@@ -115,9 +115,7 @@ import { VersionBadge } from '../shared/ui/version-badge';
             <app-avatar [name]="auth.session()?.name ?? '?'" size="sm" />
             <div class="min-w-0 flex-1">
               <strong class="block truncate text-xs">{{ auth.session()?.name }}</strong>
-              <span class="block truncate text-[11px] text-slate-500">{{
-                auth.session()?.practice || auth.session()?.email
-              }}</span>
+              <span class="block truncate text-[11px] text-slate-500">{{ userSubtitle() }}</span>
             </div>
             <button
               type="button"
@@ -215,6 +213,11 @@ export class AppShell {
   private readonly portal = inject(PortalStore);
   private readonly router = inject(Router);
   readonly mobileOpen = signal(false);
+
+  readonly userSubtitle = computed(() => {
+    const s = this.auth.session();
+    return s?.practice || s?.email || '';
+  });
 
   private readonly badges = computed<Record<string, number>>(() => ({
     '/clients': this.store.activeClients().length,
