@@ -1,4 +1,5 @@
 import {
+  applyPayment,
   PLANS,
   TRIAL_DAYS,
   canAddClient,
@@ -44,5 +45,17 @@ describe('billing', () => {
     expect(canAddClient(planById('starter'), 30)).toBe(false);
     expect(canAddClient(planById('clinic'), 10_000)).toBe(true);
     expect(PLANS.every((p) => p.yearlyMonthlyPrice < p.monthlyPrice)).toBe(true);
+  });
+
+  it('activates a paid package once per payment and extends early renewals', () => {
+    const now = new Date('2026-11-10T10:00:00Z');
+    const paid = applyPayment(createTrial(start), 'starter', 'monthly', 'ODSM1', now);
+    expect(paid.status).toBe('active');
+    expect(paid.plan).toBe('starter');
+    expect(paid.currentPeriodEnd).toBe(new Date('2026-12-10T10:00:00Z').toISOString());
+    expect(applyPayment(paid, 'starter', 'monthly', 'ODSM1', now)).toBe(paid);
+    const renewed = applyPayment(paid, 'pro', 'yearly', 'ODPY2', now);
+    expect(renewed.currentPeriodEnd).toBe(new Date('2027-12-10T10:00:00Z').toISOString());
+    expect(subscriptionState(renewed, now).status).toBe('active');
   });
 });

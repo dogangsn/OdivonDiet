@@ -90,6 +90,8 @@ export interface Subscription {
   readonly requestedPlan: PlanId | null;
   readonly requestedCycle: BillingCycle | null;
   readonly requestedAt: string | null;
+  /** PayTR order of the last confirmed payment (prevents applying it twice). */
+  readonly lastPaymentOid?: string | null;
 }
 
 export interface SubscriptionState {
@@ -148,6 +150,38 @@ export function subscriptionState(subscription: Subscription, now: Date): Subscr
     expired: status === 'expired',
     daysLeft: Math.max(0, Math.ceil(msLeft / DAY_MS)),
     trialUsedPct: trialTotal > 0 ? Math.min(100, Math.max(0, (trialUsed / trialTotal) * 100)) : 100,
+  };
+}
+
+/**
+ * Applies a confirmed payment: the package becomes active for one month or year, counted
+ * from the end of a still-running paid period so renewing early loses no days.
+ */
+export function applyPayment(
+  subscription: Subscription,
+  plan: PlanId,
+  cycle: BillingCycle,
+  oid: string,
+  now: Date,
+): Subscription {
+  if (subscription.lastPaymentOid === oid) return subscription;
+  const running =
+    subscription.status === 'active' && subscription.currentPeriodEnd
+      ? new Date(subscription.currentPeriodEnd)
+      : null;
+  const start = running && running > now ? running : now;
+  const end = new Date(start);
+  end.setMonth(end.getMonth() + (cycle === 'yearly' ? 12 : 1));
+  return {
+    ...subscription,
+    plan,
+    cycle,
+    status: 'active',
+    currentPeriodEnd: end.toISOString(),
+    requestedPlan: null,
+    requestedCycle: null,
+    requestedAt: null,
+    lastPaymentOid: oid,
   };
 }
 

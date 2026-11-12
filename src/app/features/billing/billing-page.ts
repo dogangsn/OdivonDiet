@@ -1,5 +1,9 @@
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
+import { ActivatedRoute, Router } from '@angular/router';
+import { AuthStore } from '../../core/auth/auth-store';
+import { PaymentError, PaymentGateway } from '../../core/billing/payment-gateway';
 import { SubscriptionStore } from '../../core/billing/subscription-store';
 import { DietStore } from '../../core/data/diet-store';
 import { Notify } from '../../core/notify/notify';
@@ -13,6 +17,18 @@ import {
   yearlyTotal,
 } from '../../domain/billing';
 import { PageHeader } from '../../shared/ui/page-header';
+
+interface Checkout {
+  readonly plan: Plan;
+  readonly cycle: BillingCycle;
+  readonly name: string;
+  readonly email: string;
+  readonly phone: string;
+  readonly address: string;
+  readonly busy: boolean;
+  readonly error: string | null;
+  readonly iframeUrl: SafeResourceUrl | null;
+}
 
 @Component({
   selector: 'app-billing-page',
@@ -233,15 +249,141 @@ import { PageHeader } from '../../shared/ui/page-header';
         <p class="text-center text-xs text-slate-500">
           Tüm paketlerde KVKK uyumlu veri saklama ve SSL bulunur. İstediğiniz zaman paket
           değiştirebilir ya da iptal edebilirsiniz.
+          @if (payments.enabled()) {
+            <span class="mt-1 flex items-center justify-center gap-1">
+              <span class="material-symbols-rounded !text-sm" aria-hidden="true">lock</span>Ödemeler
+              PayTR güvenli ödeme altyapısıyla alınır; kart bilgileriniz bize ulaşmaz.
+            </span>
+          }
         </p>
       </section>
     </div>
+
+    @if (checkout(); as c) {
+      <div
+        class="fixed inset-0 z-[70] grid place-items-center overflow-y-auto bg-slate-950/50 p-4 backdrop-blur-[2px]"
+      >
+        <section
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="checkout-title"
+          class="odv-card w-full max-w-lg overflow-hidden"
+        >
+          <header
+            class="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4 dark:border-slate-800"
+          >
+            <div>
+              <h2 id="checkout-title" class="odv-section-title">
+                {{ c.plan.name }} · {{ c.cycle === 'yearly' ? 'Yıllık' : 'Aylık' }}
+              </h2>
+              <p class="tabular text-xs text-slate-500">
+                Ödenecek tutar
+                <strong class="text-slate-900 dark:text-white">{{ total(c.plan, c.cycle) }}</strong>
+                (KDV dahil)
+              </p>
+            </div>
+            <button type="button" class="odv-icon-btn" aria-label="Kapat" (click)="closeCheckout()">
+              <span class="material-symbols-rounded">close</span>
+            </button>
+          </header>
+
+          @if (c.iframeUrl) {
+            <iframe
+              [src]="c.iframeUrl"
+              title="PayTR güvenli ödeme"
+              class="block h-[640px] max-h-[75vh] w-full border-0 bg-white"
+              allow="payment"
+            ></iframe>
+          } @else {
+            <form class="space-y-4 p-5" (submit)="pay($event)">
+              <p class="text-xs text-slate-500">
+                Fatura bilgileriniz PayTR'ye iletilir. Kart bilgilerini bir sonraki adımda PayTR'nin
+                güvenli sayfasına gireceksiniz.
+              </p>
+              <label class="block">
+                <span class="odv-label">Ad soyad / firma</span>
+                <input
+                  class="odv-input"
+                  name="name"
+                  autocomplete="name"
+                  required
+                  [value]="c.name"
+                  (input)="setField('name', $event)"
+                />
+              </label>
+              <div class="grid gap-4 sm:grid-cols-2">
+                <label class="block">
+                  <span class="odv-label">E-posta</span>
+                  <input
+                    class="odv-input"
+                    type="email"
+                    name="email"
+                    autocomplete="email"
+                    required
+                    [value]="c.email"
+                    (input)="setField('email', $event)"
+                  />
+                </label>
+                <label class="block">
+                  <span class="odv-label">Telefon</span>
+                  <input
+                    class="odv-input"
+                    type="tel"
+                    name="phone"
+                    autocomplete="tel"
+                    required
+                    placeholder="05xx xxx xx xx"
+                    [value]="c.phone"
+                    (input)="setField('phone', $event)"
+                  />
+                </label>
+              </div>
+              <label class="block">
+                <span class="odv-label">Fatura adresi</span>
+                <textarea
+                  class="odv-input min-h-20"
+                  name="address"
+                  autocomplete="street-address"
+                  required
+                  [value]="c.address"
+                  (input)="setField('address', $event)"
+                ></textarea>
+              </label>
+              @if (c.error) {
+                <p
+                  role="alert"
+                  class="rounded-xl bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 dark:bg-rose-950/50 dark:text-rose-300"
+                >
+                  {{ c.error }}
+                </p>
+              }
+              <button
+                type="submit"
+                class="odv-btn-primary w-full justify-center"
+                [disabled]="c.busy"
+              >
+                <span class="material-symbols-rounded !text-lg">{{
+                  c.busy ? 'progress_activity' : 'lock'
+                }}</span>
+                {{ c.busy ? 'Hazırlanıyor…' : 'Güvenli ödemeye geç' }}
+              </button>
+            </form>
+          }
+        </section>
+      </div>
+    }
   `,
 })
 export class BillingPage {
   readonly subs = inject(SubscriptionStore);
   private readonly diet = inject(DietStore);
   private readonly notify = inject(Notify);
+  readonly payments = inject(PaymentGateway);
+  private readonly auth = inject(AuthStore);
+  private readonly sanitizer = inject(DomSanitizer);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
+  readonly checkout = signal<Checkout | null>(null);
   readonly plans = PLANS;
   readonly trialDays = TRIAL_DAYS;
   readonly cycle = signal<BillingCycle>('monthly');
@@ -270,6 +412,96 @@ export class BillingPage {
     return 'bg-violet-50 text-violet-700 dark:bg-violet-500/15 dark:text-violet-200';
   });
 
+  constructor() {
+    const params = this.route.snapshot.queryParamMap;
+    const oid = params.get('oid');
+    const result = params.get('payment');
+    // PayTR opens the return URL inside its iFrame; continue in the main window.
+    if (oid && result && window.top && window.top !== window.self) {
+      window.top.location.href = window.location.href;
+      return;
+    }
+    void this.payments.checkEnabled();
+    if (oid && result) void this.handleReturn(oid, result);
+  }
+
+  total(plan: Plan, cycle: BillingCycle): string {
+    return formatTry(cycle === 'yearly' ? yearlyTotal(plan) : plan.monthlyPrice);
+  }
+
+  setField(field: 'name' | 'email' | 'phone' | 'address', event: Event): void {
+    const value = (event.target as HTMLInputElement).value;
+    this.checkout.update((c) => (c ? { ...c, [field]: value, error: null } : c));
+  }
+
+  closeCheckout(): void {
+    this.checkout.set(null);
+  }
+
+  async pay(event: Event): Promise<void> {
+    event.preventDefault();
+    const c = this.checkout();
+    if (!c || c.busy) return;
+    const phone = c.phone.replace(/[^\d+]/g, '');
+    if (!c.name.trim() || !c.email.includes('@') || phone.length < 10 || !c.address.trim()) {
+      this.checkout.set({ ...c, error: 'Tüm alanları doldurun; telefon en az 10 haneli olmalı.' });
+      return;
+    }
+    this.checkout.set({ ...c, busy: true, error: null });
+    try {
+      const session = await this.payments.start(c.plan.id, c.cycle, {
+        name: c.name.trim(),
+        email: c.email.trim(),
+        phone,
+        address: c.address.trim(),
+      });
+      this.checkout.update((x) =>
+        x
+          ? {
+              ...x,
+              busy: false,
+              iframeUrl: this.sanitizer.bypassSecurityTrustResourceUrl(session.iframeUrl),
+            }
+          : x,
+      );
+    } catch (error) {
+      const message = error instanceof PaymentError ? error.message : 'Ödeme başlatılamadı.';
+      this.checkout.update((x) => (x ? { ...x, busy: false, error: message } : x));
+    }
+  }
+
+  private async handleReturn(oid: string, result: string): Promise<void> {
+    void this.router.navigate([], { queryParams: {}, replaceUrl: true });
+    if (result !== 'ok') {
+      this.notify.error(
+        'Ödeme tamamlanmadı',
+        'Kartınızdan çekim yapılmadı. Tekrar deneyebilirsiniz.',
+      );
+      return;
+    }
+    // PayTR may confirm a few seconds after the redirect.
+    for (let attempt = 0; attempt < 5; attempt++) {
+      try {
+        const status = await this.payments.status(oid);
+        if (status.paid) {
+          this.subs.activatePaid(status.plan, status.cycle, oid);
+          this.notify.success(
+            'Ödemeniz alındı',
+            `${planById(status.plan).name} paketiniz aktifleştirildi. Teşekkürler!`,
+          );
+          return;
+        }
+      } catch {
+        // retry below
+      }
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
+    this.notify.warning(
+      'Ödeme onayı bekleniyor',
+      'Onay gelince paketiniz aktifleşecek. Sorun olursa destek ekibimize yazın.',
+    );
+  }
+
   price(plan: Plan): string {
     return formatTry(this.cycle() === 'yearly' ? plan.yearlyMonthlyPrice : plan.monthlyPrice);
   }
@@ -286,7 +518,7 @@ export class BillingPage {
   buttonLabel(plan: Plan): string {
     const s = this.subs.state();
     if (this.isRequested(plan)) return 'Talep alındı';
-    if (s?.status === 'active' && s.plan.id === plan.id) return 'Mevcut paketiniz';
+    if (s?.status === 'active' && s.plan.id === plan.id) return 'Süreyi uzat';
     return s?.trialing && s.plan.id === plan.id ? 'Bu paketle devam et' : 'Bu paketi seç';
   }
 
@@ -297,6 +529,21 @@ export class BillingPage {
         `${plan.name} paketi ${limit} aktif danışana kadar`,
         'Bu paketi seçmeden önce bazı danışanları arşivleyin ya da daha büyük bir paket seçin.',
       );
+      return;
+    }
+    if (this.payments.enabled() ?? (await this.payments.checkEnabled())) {
+      const session = this.auth.session();
+      this.checkout.set({
+        plan,
+        cycle: this.cycle(),
+        name: session?.practice || session?.name || '',
+        email: session?.email ?? '',
+        phone: '',
+        address: '',
+        busy: false,
+        error: null,
+        iframeUrl: null,
+      });
       return;
     }
     const cycleLabel = this.cycle() === 'yearly' ? 'yıllık' : 'aylık';

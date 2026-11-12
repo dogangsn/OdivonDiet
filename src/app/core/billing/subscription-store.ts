@@ -4,6 +4,7 @@ import {
   PlanId,
   Subscription,
   SubscriptionState,
+  applyPayment,
   canAddClient,
   createTrial,
   subscriptionState,
@@ -72,6 +73,13 @@ export class SubscriptionStore {
       requestedCycle: cycle,
       requestedAt: new Date().toISOString(),
     });
+  }
+
+  /** A PayTR payment was confirmed by the server: activate the paid package. */
+  activatePaid(plan: PlanId, cycle: BillingCycle, oid: string): void {
+    const current = this.subscription();
+    if (!current) return;
+    this.save(applyPayment(current, plan, cycle, oid, new Date()));
   }
 
   cancelRequest(): void {

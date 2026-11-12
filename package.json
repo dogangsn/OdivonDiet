@@ -11,8 +11,8 @@
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
-    "contract": "vitest run src/app/core/api/api.contract.spec.ts",
-    "typecheck": "tsc -p tsconfig.app.json --noEmit",
+    "contract": "vitest run src/app/core/api/api.contract.spec.ts worker",
+    "typecheck": "tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.worker.json",
     "check": "npm run typecheck && npm test -- --watch=false && npm run contract && npm run build",
     "deploy": "npm run build && wrangler deploy",
     "preview": "npm run build && wrangler dev"
