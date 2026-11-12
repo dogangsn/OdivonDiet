@@ -1,8 +1,20 @@
 import { Routes } from '@angular/router';
-import { roleGuard } from './core/auth/auth.guard';
+import { landingGuard, roleGuard } from './core/auth/auth.guard';
 import { subscriptionGuard } from './core/billing/subscription.guard';
 
 export const routes: Routes = [
+  {
+    path: '',
+    pathMatch: 'full',
+    canActivate: [landingGuard],
+    title: 'OdivonDiet · Klinik Beslenme, Menü Mühendisliği & Danışan Yönetim Platformu',
+    loadComponent: () => import('./features/landing/landing-page').then((m) => m.LandingPage),
+  },
+  {
+    path: 'tanitim',
+    title: 'Ürün Tanıtımı & Özellikler · OdivonDiet',
+    loadComponent: () => import('./features/landing/landing-page').then((m) => m.LandingPage),
+  },
   {
     path: 'login',
     loadComponent: () => import('./features/auth/auth-page').then((m) => m.AuthPage),

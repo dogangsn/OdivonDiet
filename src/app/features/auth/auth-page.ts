@@ -278,17 +278,16 @@ const MEMBER_PROFILES: readonly DemoMemberProfile[] = [
           aria-hidden="true"
         ></div>
         <div
-          class="relative flex items-center justify-between px-5 pt-5 sm:px-8 lg:justify-end lg:pt-7"
+          class="relative flex items-center justify-between px-5 pt-5 sm:px-8 lg:pt-7"
         >
-          <div class="flex items-center gap-2.5 lg:hidden">
-            <span
-              class="grid size-9 place-items-center rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 text-white shadow-md shadow-violet-500/30"
+          <div class="flex items-center gap-2.5">
+            <a
+              routerLink="/tanitim"
+              class="odv-btn-ghost !min-h-9 !px-3 text-xs font-bold"
             >
-              <span class="material-symbols-rounded icon-fill !text-xl" aria-hidden="true"
-                >nutrition</span
-              >
-            </span>
-            <strong class="text-lg font-extrabold">{{ product.name }}</strong>
+              <span class="material-symbols-rounded !text-base" aria-hidden="true">arrow_back</span>
+              Ürün Tanıtımı & Vitrin
+            </a>
           </div>
           <button
             type="button"
