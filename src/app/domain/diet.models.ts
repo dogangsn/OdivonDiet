@@ -100,6 +100,85 @@ export interface Measurement {
   readonly note: string;
   /** Who entered it. Missing means the dietitian (records from before the member portal). */
   readonly source?: 'dietitian' | 'member';
+  /** Segmental BIA (InBody / Tanita) & regional circumference extensions. */
+  readonly muscleMassKg?: number | null;
+  readonly visceralFatRating?: number | null;
+  readonly bodyWaterPct?: number | null;
+  readonly ecwTbwRatio?: number | null;
+  readonly metabolicAge?: number | null;
+  readonly phaseAngleDeg?: number | null;
+  readonly neckCm?: number | null;
+  readonly armCm?: number | null;
+  readonly thighCm?: number | null;
+}
+
+export interface LabPanel {
+  readonly id: string;
+  readonly clientId: string;
+  readonly date: string;
+  readonly fastingGlucoseMgDl: number | null;
+  readonly fastingInsulinUiuMl: number | null;
+  readonly hba1cPct: number | null;
+  readonly triglyceridesMgDl: number | null;
+  readonly hdlMgDl: number | null;
+  readonly ldlMgDl: number | null;
+  readonly ferritinNgMl: number | null;
+  readonly vitaminDNgMl: number | null;
+  readonly vitaminB12PgMl: number | null;
+  readonly tshMiuL: number | null;
+  readonly uricAcidMgDl: number | null;
+  readonly crpMgL: number | null;
+  readonly note?: string;
+}
+
+export interface MedicationEntry {
+  readonly id: string;
+  readonly clientId: string;
+  readonly name: string;
+  readonly activeIngredient:
+    | 'metformin'
+    | 'levothyroxine'
+    | 'glp1_semaglutide'
+    | 'glp1_tirzepatide'
+    | 'statin'
+    | 'warfarin'
+    | 'orlistat'
+    | 'iron_supplement'
+    | 'ssri';
+  readonly dosage: string;
+  readonly schedule: string;
+}
+
+export interface SupplementProtocolItem {
+  readonly id: string;
+  readonly clientId: string;
+  readonly name: string;
+  readonly dose: string;
+  readonly timing: 'morning_fasting' | 'with_breakfast' | 'with_lunch' | 'pre_workout' | 'bedtime';
+  readonly clinicalReason: string;
+  readonly durationWeeks: number;
+}
+
+export type Glp1Stage =
+  | 'none'
+  | 'glp1_initiation'
+  | 'glp1_titration'
+  | 'glp1_maintenance'
+  | 'bariatric_liquid'
+  | 'bariatric_puree'
+  | 'bariatric_soft'
+  | 'bariatric_regular';
+
+export interface Glp1BariatricProfile {
+  readonly clientId: string;
+  readonly stage: Glp1Stage;
+  readonly agentName: string;
+  readonly weeklyDoseMg: number;
+  readonly injectionDay: string;
+  readonly giSymptomScore: number; // 1 (none) to 5 (severe nausea/reflux/constipation)
+  readonly bristolStoolType: number; // 1..7 Bristol Stool Scale
+  readonly resistanceTrainingDays: number;
+  readonly notes: string;
 }
 
 export interface Meal {
@@ -230,4 +309,23 @@ export const GI_LABELS: Record<GlycemicIndex, string> = {
   low: 'Düşük Gİ',
   medium: 'Orta Gİ',
   high: 'Yüksek Gİ',
+};
+
+export const SUPPLEMENT_TIMING_LABELS: Record<SupplementProtocolItem['timing'], string> = {
+  morning_fasting: 'Sabah aç karnına (kahvaltıdan 45 dk önce)',
+  with_breakfast: 'Kahvaltı ile birlikte (yağ içeren öğün)',
+  with_lunch: 'Öğle yemeği ile birlikte',
+  pre_workout: 'Egzersizden 30 dk önce',
+  bedtime: 'Gece yatmadan 1 saat önce',
+};
+
+export const GLP1_STAGE_LABELS: Record<Glp1Stage, string> = {
+  none: 'Standart Protokol (GLP-1 / Cerrahi Yok)',
+  glp1_initiation: 'GLP-1 Başlangıç Fazı (0.25 mg · GI Adaptasyon)',
+  glp1_titration: 'GLP-1 Doz Artırım / Titrasyon Fazı (0.5–1.7 mg)',
+  glp1_maintenance: 'GLP-1 İdame & Kas Koruma Fazı',
+  bariatric_liquid: 'Bariatrik Faz 1–2: Berrak & Tam Sıvı Dönemi',
+  bariatric_puree: 'Bariatrik Faz 3: Püre & Yüksek Protein Dönemi',
+  bariatric_soft: 'Bariatrik Faz 4: Yumuşak Katı Geçiş Dönemi',
+  bariatric_regular: 'Bariatrik Faz 5: Uzun Dönem Metabolik Koruma',
 };

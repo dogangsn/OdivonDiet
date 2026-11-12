@@ -20,6 +20,7 @@ export const PRODUCT_NAVIGATION: readonly NavigationGroup[] = [
       { path: '/clients', icon: 'group', label: 'Danışanlar' },
       { path: '/plans', icon: 'restaurant_menu', label: 'Beslenme planları' },
       { path: '/foods', icon: 'grocery', label: 'Besin & yemekler' },
+      { path: '/clinical-lab', icon: 'biotech', label: 'Klinik & Biyobelirteç' },
       { path: '/measurements', icon: 'monitor_weight', label: 'Ölçümler' },
       { path: '/consultations', icon: 'event_note', label: 'Görüşmeler' },
       { path: '/reports', icon: 'insights', label: 'Raporlar' },

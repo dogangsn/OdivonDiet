@@ -2,7 +2,13 @@ import { DatePipe, DecimalPipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { DietStore } from '../../core/data/diet-store';
-import { daysBetween, round1, summarizeMeals } from '../../domain/diet-calc';
+import {
+  analyzeChronoNutrition,
+  buildGroceryList,
+  daysBetween,
+  round1,
+  summarizeMeals,
+} from '../../domain/diet-calc';
 import {
   EXCHANGE_GROUP_LABELS,
   ExchangeGroup,
@@ -34,6 +40,9 @@ const STATUS_TONE: Record<PlanStatus, string> = {
         description="Enerji hedefi, makro dağılımı (g ve g/kg), BeBis değişim listeleri ve öğün bazlı yemek/ürün içerikleri."
       >
         <div actions class="flex flex-wrap items-center gap-2">
+          <a routerLink="/clinical-lab" class="odv-btn-ghost">
+            <span class="material-symbols-rounded !text-lg">biotech</span>Klinik & İlaç-Besin Analizi
+          </a>
           <a routerLink="/foods" class="odv-btn-soft">
             <span class="material-symbols-rounded !text-lg">grocery</span>Besin & yemek kütüphanesi
           </a>
@@ -215,19 +224,88 @@ const STATUS_TONE: Record<PlanStatus, string> = {
                                 {{ planSummary(plan).fatG }} g · Lif:
                                 {{ planSummary(plan).fiberG }} g
                               </span>
+                              <span class="odv-badge odv-tone-primary">
+                                Sirkadiyen Açlık: {{ chronoFor(plan).fastingWindowHours }}s ({{
+                                  chronoFor(plan).firstMealTime
+                                }}–{{ chronoFor(plan).lastMealTime }})
+                              </span>
                             </div>
                           </div>
 
                           @if (exchangeBadges(plan).length) {
-                            <div class="flex flex-wrap items-center gap-1.5 text-xs">
-                              <span class="font-semibold text-slate-500"
-                                >Günlük BeBis Değişim Özeti:</span
+                            <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
+                              <div class="flex flex-wrap items-center gap-1.5">
+                                <span class="font-semibold text-slate-500"
+                                  >Günlük BeBis Değişim Özeti:</span
+                                >
+                                @for (ex of exchangeBadges(plan); track ex.key) {
+                                  <span class="odv-badge odv-tone-neutral">
+                                    {{ ex.label }}: {{ ex.count }} porsiyon
+                                  </span>
+                                }
+                              </div>
+                              <button
+                                type="button"
+                                class="odv-btn-soft !min-h-8 !px-3 text-xs"
+                                (click)="showGrocery.update((x) => !x)"
                               >
-                              @for (ex of exchangeBadges(plan); track ex.key) {
-                                <span class="odv-badge odv-tone-neutral">
-                                  {{ ex.label }}: {{ ex.count }} porsiyon
-                                </span>
-                              }
+                                <span class="material-symbols-rounded !text-base">shopping_cart</span>
+                                {{
+                                  showGrocery()
+                                    ? 'Alışveriş Listesini Gizle'
+                                    : '7 Günlük Akıllı Alışveriş & Prep Listesi'
+                                }}
+                              </button>
+                            </div>
+                          }
+
+                          @if (showGrocery()) {
+                            <div
+                              class="rounded-2xl border border-violet-200 bg-white p-4 dark:border-violet-900/40 dark:bg-slate-900"
+                            >
+                              <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+                                <div>
+                                  <span class="odv-eyebrow">Otomatik Mutfak & Market Hesabı</span>
+                                  <h4 class="text-sm font-extrabold">
+                                    {{ groceryDays() }} Günlük Toplam Gramaj & Alışveriş Listesi
+                                  </h4>
+                                </div>
+                                <div class="odv-segment" role="group" aria-label="Alışveriş listesi gün sayısı">
+                                  @for (d of [1, 3, 7, 14]; track d) {
+                                    <button
+                                      type="button"
+                                      class="odv-segment-item !px-2.5 !py-1 text-xs"
+                                      [attr.aria-pressed]="groceryDays() === d"
+                                      (click)="groceryDays.set(d)"
+                                    >
+                                      {{ d }} Gün
+                                    </button>
+                                  }
+                                </div>
+                              </div>
+                              <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                                @for (g of groceryListFor(plan); track g.foodId) {
+                                  <div
+                                    class="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 text-xs dark:bg-slate-800/60"
+                                  >
+                                    <div>
+                                      <strong class="block text-slate-800 dark:text-white">{{
+                                        g.name
+                                      }}</strong>
+                                      <span class="text-[11px] text-slate-500"
+                                        >{{ g.totalPortions }} × {{ g.unit }}</span
+                                      >
+                                    </div>
+                                    <span class="tabular font-extrabold text-violet-600">
+                                      {{
+                                        g.totalGrams >= 1000
+                                          ? (g.totalGrams / 1000 | number: '1.1-2') + ' kg'
+                                          : g.totalGrams + ' g'
+                                      }}
+                                    </span>
+                                  </div>
+                                }
+                              </div>
                             </div>
                           }
 
@@ -324,6 +402,8 @@ export class PlansPage {
   ];
   readonly filter = signal<PlanStatus | 'all'>('active');
   readonly inspectedPlanId = signal<string | null>('p-1');
+  readonly showGrocery = signal(false);
+  readonly groceryDays = signal(7);
 
   readonly rows = computed(() =>
     this.store
@@ -353,6 +433,14 @@ export class PlansPage {
 
   planSummary(plan: MealPlan) {
     return summarizeMeals(plan.meals);
+  }
+
+  chronoFor(plan: MealPlan) {
+    return analyzeChronoNutrition(plan.meals);
+  }
+
+  groceryListFor(plan: MealPlan) {
+    return buildGroceryList(plan.meals, this.groceryDays());
   }
 
   clientPerKg(clientId: string, grams: number): number {

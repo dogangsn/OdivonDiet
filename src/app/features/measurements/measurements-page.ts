@@ -1,7 +1,7 @@
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { ClientView, DietStore } from '../../core/data/diet-store';
-import { round1 } from '../../domain/diet-calc';
+import { leanBodyMassKg, round1, usNavyBodyFatPct, waistHipRisk } from '../../domain/diet-calc';
 import { Measurement } from '../../domain/diet.models';
 import { Avatar } from '../../shared/ui/avatar';
 import { EmptyState } from '../../shared/ui/empty-state';
@@ -9,12 +9,13 @@ import { PageHeader } from '../../shared/ui/page-header';
 import { TrendChart } from '../../shared/ui/trend-chart';
 import { QuickActions } from '../forms/quick-actions';
 
-type Metric = 'weightKg' | 'waistCm' | 'bodyFatPct';
+type Metric = 'weightKg' | 'waistCm' | 'bodyFatPct' | 'muscleMassKg';
 
 const METRICS: { key: Metric; label: string; unit: string }[] = [
   { key: 'weightKg', label: 'Kilo', unit: 'kg' },
   { key: 'waistCm', label: 'Bel', unit: 'cm' },
   { key: 'bodyFatPct', label: 'Yağ oranı', unit: '%' },
+  { key: 'muscleMassKg', label: 'İskelet kası (SMM)', unit: 'kg' },
 ];
 
 @Component({
@@ -106,6 +107,83 @@ const METRICS: { key: Metric; label: string; unit: string }[] = [
               </div>
             </section>
 
+            @if (v.lastMeasurement; as last) {
+              <section
+                class="odv-card p-5"
+                aria-label="InBody / Tanita BIA ve Antropometrik Vücut Kompozisyonu"
+              >
+                <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <span class="odv-eyebrow">Segmental BIA & Antropometri</span>
+                    <h2 class="text-sm font-extrabold">
+                      InBody / Tanita Hücresel Kompozisyon & Ödem Analizi
+                    </h2>
+                  </div>
+                  @if (whrStatus(); as whr) {
+                    <span class="odv-badge" [class]="'odv-tone-' + whr.tone">
+                      Bel/Kalça: {{ whr.ratio }} ({{ whr.label }})
+                    </span>
+                  }
+                </div>
+
+                <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+                  <div class="rounded-xl bg-slate-50 p-3 dark:bg-slate-800/50">
+                    <span class="text-[11px] text-slate-500">İskelet Kası (SMM)</span>
+                    <strong class="tabular mt-0.5 block text-lg font-extrabold text-violet-600">
+                      {{ last.muscleMassKg ?? '—' }} <small class="text-xs">kg</small>
+                    </strong>
+                    <span class="text-[10px] text-slate-400">LBM: {{ lbmKg() }} kg</span>
+                  </div>
+
+                  <div class="rounded-xl bg-slate-50 p-3 dark:bg-slate-800/50">
+                    <span class="text-[11px] text-slate-500">Visseral Yağ</span>
+                    <strong
+                      class="tabular mt-0.5 block text-lg font-extrabold"
+                      [class.text-rose-600]="(last.visceralFatRating ?? 0) >= 10"
+                    >
+                      Seviye {{ last.visceralFatRating ?? '—' }}
+                    </strong>
+                    <span class="text-[10px] text-slate-400">Güvenli: 1–9</span>
+                  </div>
+
+                  <div class="rounded-xl bg-slate-50 p-3 dark:bg-slate-800/50">
+                    <span class="text-[11px] text-slate-500">ECW/TBW (Ödem)</span>
+                    <strong
+                      class="tabular mt-0.5 block text-lg font-extrabold"
+                      [class.text-amber-600]="(last.ecwTbwRatio ?? 0.38) >= 0.39"
+                    >
+                      {{ last.ecwTbwRatio !== undefined && last.ecwTbwRatio !== null ? (last.ecwTbwRatio | number: '1.3-3') : '0,380' }}
+                    </strong>
+                    <span class="text-[10px] text-slate-400">Normal: 0,360–0,390</span>
+                  </div>
+
+                  <div class="rounded-xl bg-slate-50 p-3 dark:bg-slate-800/50">
+                    <span class="text-[11px] text-slate-500">Faz Açısı (Hücre)</span>
+                    <strong class="tabular mt-0.5 block text-lg font-extrabold text-emerald-600">
+                      {{ last.phaseAngleDeg ?? 5.9 }}°
+                    </strong>
+                    <span class="text-[10px] text-slate-400">Optimal: ≥5,5°</span>
+                  </div>
+
+                  <div class="rounded-xl bg-slate-50 p-3 dark:bg-slate-800/50">
+                    <span class="text-[11px] text-slate-500">Vücut Suyu (TBW)</span>
+                    <strong class="tabular mt-0.5 block text-lg font-extrabold">
+                      %{{ last.bodyWaterPct ?? '—' }}
+                    </strong>
+                    <span class="text-[10px] text-slate-400">Metabolik yaş: {{ last.metabolicAge ?? v.age }}</span>
+                  </div>
+
+                  <div class="rounded-xl bg-slate-50 p-3 dark:bg-slate-800/50">
+                    <span class="text-[11px] text-slate-500">US Navy Çevre Yağ</span>
+                    <strong class="tabular mt-0.5 block text-lg font-extrabold">
+                      {{ navyFatPct() !== null ? '%' + navyFatPct() : '—' }}
+                    </strong>
+                    <span class="text-[10px] text-slate-400">Boyun/Bel/Kalça formülü</span>
+                  </div>
+                </div>
+              </section>
+            }
+
             <section class="odv-card p-5">
               <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <div>
@@ -143,6 +221,8 @@ const METRICS: { key: Metric; label: string; unit: string }[] = [
                       <th class="odv-th">Bel</th>
                       <th class="odv-th">Kalça</th>
                       <th class="odv-th">Yağ %</th>
+                      <th class="odv-th">Kas (SMM)</th>
+                      <th class="odv-th">ECW/TBW</th>
                       <th class="odv-th">Not</th>
                     </tr>
                   </thead>
@@ -173,6 +253,20 @@ const METRICS: { key: Metric; label: string; unit: string }[] = [
                         <td class="odv-td tabular text-slate-600 dark:text-slate-300">
                           {{
                             row.m.bodyFatPct === null ? '—' : (row.m.bodyFatPct | number: '1.0-1')
+                          }}
+                        </td>
+                        <td class="odv-td tabular text-slate-600 dark:text-slate-300">
+                          {{
+                            row.m.muscleMassKg === null || row.m.muscleMassKg === undefined
+                              ? '—'
+                              : (row.m.muscleMassKg | number: '1.0-1') + ' kg'
+                          }}
+                        </td>
+                        <td class="odv-td tabular text-xs text-slate-600 dark:text-slate-300">
+                          {{
+                            row.m.ecwTbwRatio === null || row.m.ecwTbwRatio === undefined
+                              ? '—'
+                              : (row.m.ecwTbwRatio | number: '1.3-3')
                           }}
                         </td>
                         <td class="odv-td max-w-56 truncate text-xs text-slate-500">
@@ -230,8 +324,39 @@ export class MeasurementsPage {
   readonly points = computed(() => {
     const key = this.metric();
     return this.rows()
-      .filter((m) => m[key] !== null)
+      .filter((m) => m[key] !== null && m[key] !== undefined)
       .map((m) => ({ date: m.date, value: m[key] as number }));
+  });
+
+  readonly lbmKg = computed(() => {
+    const v = this.selected();
+    if (!v) return 0;
+    return leanBodyMassKg(
+      v.currentWeightKg,
+      v.lastMeasurement?.bodyFatPct,
+      v.client.heightCm,
+      v.client.sex,
+    );
+  });
+
+  readonly whrStatus = computed(() => {
+    const v = this.selected();
+    const last = v?.lastMeasurement;
+    if (!v || !last?.waistCm || !last?.hipCm) return null;
+    return waistHipRisk(v.client.sex, last.waistCm, last.hipCm);
+  });
+
+  readonly navyFatPct = computed(() => {
+    const v = this.selected();
+    const last = v?.lastMeasurement;
+    if (!v || !last) return null;
+    return usNavyBodyFatPct(
+      v.client.sex,
+      v.client.heightCm,
+      last.waistCm,
+      last.neckCm ?? 34.5,
+      last.hipCm,
+    );
   });
   onTrack(v: ClientView): boolean {
     const wantsLoss = v.client.targetWeightKg < v.client.startWeightKg;

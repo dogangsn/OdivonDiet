@@ -4,9 +4,13 @@ import {
   Client,
   Consultation,
   FoodItem,
+  Glp1BariatricProfile,
+  LabPanel,
   Meal,
   MealPlan,
   Measurement,
+  MedicationEntry,
+  SupplementProtocolItem,
 } from '../../domain/diet.models';
 
 export const SEED_FOODS: FoodItem[] = [
@@ -753,16 +757,30 @@ export function createSeed(today: Date) {
     ],
   };
   const measurements: Measurement[] = Object.entries(series).flatMap(([clientId, rows]) =>
-    rows.map(([offset, weightKg, bodyFatPct], index) => ({
-      id: `m-${clientId}-${index}`,
-      clientId,
-      date: isoDate(day(offset)),
-      weightKg,
-      waistCm: Math.round(weightKg * 1.02),
-      hipCm: Math.round(weightKg * 1.2),
-      bodyFatPct,
-      note: index === 0 ? 'Başlangıç ölçümü' : '',
-    })),
+    rows.map(([offset, weightKg, bodyFatPct], index) => {
+      const bf = bodyFatPct ?? 25;
+      const leanKg = Math.round(weightKg * (1 - bf / 100) * 10) / 10;
+      const muscleMassKg = Math.round(leanKg * 0.56 * 10) / 10;
+      const visceralFatRating = Math.max(2, Math.round(bf * 0.34));
+      const bodyWaterPct = Math.round((100 - bf) * 0.73 * 10) / 10;
+      return {
+        id: `m-${clientId}-${index}`,
+        clientId,
+        date: isoDate(day(offset)),
+        weightKg,
+        waistCm: Math.round(weightKg * 1.02),
+        hipCm: Math.round(weightKg * 1.2),
+        bodyFatPct,
+        muscleMassKg,
+        visceralFatRating,
+        bodyWaterPct,
+        ecwTbwRatio: clientId === 'c-2' ? 0.391 : 0.378,
+        metabolicAge: clientId === 'c-4' ? 23 : 34,
+        phaseAngleDeg: clientId === 'c-4' ? 7.1 : 5.8,
+        neckCm: clientId === 'c-2' || clientId === 'c-4' ? 39.5 : 33.5,
+        note: index === 0 ? 'Başlangıç InBody BIA & çevre ölçümü' : 'Kontrol BIA analizi',
+      };
+    }),
   );
 
   const plans: MealPlan[] = [
@@ -868,7 +886,174 @@ export function createSeed(today: Date) {
     },
   ];
 
-  return { clients, measurements, plans, consultations, activity, foods: [...SEED_FOODS] };
+  const labs: LabPanel[] = [
+    {
+      id: 'lab-c1-1',
+      clientId: 'c-1',
+      date: isoDate(day(-10)),
+      fastingGlucoseMgDl: 98,
+      fastingInsulinUiuMl: 11.8,
+      hba1cPct: 5.6,
+      triglyceridesMgDl: 138,
+      hdlMgDl: 52,
+      ldlMgDl: 118,
+      ferritinNgMl: 22,
+      vitaminDNgMl: 21,
+      vitaminB12PgMl: 310,
+      tshMiuL: 3.4,
+      uricAcidMgDl: 4.9,
+      crpMgL: 1.8,
+      note: 'HOMA-IR 2.86 (insülin direnci geriliyor), Ferritin ve D3 düşük.',
+    },
+    {
+      id: 'lab-c2-1',
+      clientId: 'c-2',
+      date: isoDate(day(-14)),
+      fastingGlucoseMgDl: 112,
+      fastingInsulinUiuMl: 16.4,
+      hba1cPct: 6.1,
+      triglyceridesMgDl: 196,
+      hdlMgDl: 41,
+      ldlMgDl: 144,
+      ferritinNgMl: 110,
+      vitaminDNgMl: 26,
+      vitaminB12PgMl: 295,
+      tshMiuL: 2.1,
+      uricAcidMgDl: 6.9,
+      crpMgL: 3.1,
+      note: 'Prediyabetik profil, TG/HDL oranı 4.78 (yüksek aterojenik risk).',
+    },
+    {
+      id: 'lab-c4-1',
+      clientId: 'c-4',
+      date: isoDate(day(-20)),
+      fastingGlucoseMgDl: 84,
+      fastingInsulinUiuMl: 5.2,
+      hba1cPct: 5.0,
+      triglyceridesMgDl: 74,
+      hdlMgDl: 64,
+      ldlMgDl: 92,
+      ferritinNgMl: 86,
+      vitaminDNgMl: 44,
+      vitaminB12PgMl: 540,
+      tshMiuL: 1.7,
+      uricAcidMgDl: 5.4,
+      crpMgL: 0.6,
+      note: 'Atletik optimal biyokimya profili.',
+    },
+  ];
+
+  const medications: MedicationEntry[] = [
+    {
+      id: 'med-1',
+      clientId: 'c-1',
+      name: 'Glifor 1000 mg',
+      activeIngredient: 'metformin',
+      dosage: '2×1000 mg',
+      schedule: 'Sabah ve akşam ana öğün ortasında',
+    },
+    {
+      id: 'med-2',
+      clientId: 'c-1',
+      name: 'Euthyrox 50 mcg',
+      activeIngredient: 'levothyroxine',
+      dosage: '1×50 mcg',
+      schedule: 'Sabah kahvaltıdan 45 dk önce aç karnına',
+    },
+    {
+      id: 'med-3',
+      clientId: 'c-2',
+      name: 'Ozempic (Semaglutid)',
+      activeIngredient: 'glp1_semaglutide',
+      dosage: 'Haftada 1×1.0 mg SC',
+      schedule: 'Pazar sabahı subkutan enjeksiyon',
+    },
+    {
+      id: 'med-4',
+      clientId: 'c-2',
+      name: 'Lipitor 20 mg',
+      activeIngredient: 'statin',
+      dosage: '1×20 mg',
+      schedule: 'Akşam 21:00',
+    },
+  ];
+
+  const supplements: SupplementProtocolItem[] = [
+    {
+      id: 'sup-1',
+      clientId: 'c-1',
+      name: 'Vitamin D3 + K2 (MK-7) Damla',
+      dose: '4000 IU D3 + 100 mcg K2',
+      timing: 'with_breakfast',
+      clinicalReason: 'Serum 25-OH D3 düzeyi 21 ng/mL (<40 ng/mL hedefi)',
+      durationWeeks: 8,
+    },
+    {
+      id: 'sup-2',
+      clientId: 'c-1',
+      name: 'Sublingual Metilkobalamin (B12)',
+      dose: '1000 mcg dil altı',
+      timing: 'morning_fasting',
+      clinicalReason: 'Metformin kullanımına bağlı B12 düşüklüğü (310 pg/mL)',
+      durationWeeks: 12,
+    },
+    {
+      id: 'sup-3',
+      clientId: 'c-1',
+      name: 'Magnezyum Bisglisinat',
+      dose: '200 mg elementel Mg',
+      timing: 'bedtime',
+      clinicalReason: 'İnsülin duyarlılığı, uyku kalitesi ve luteal faz ödem kontrolü',
+      durationWeeks: 12,
+    },
+    {
+      id: 'sup-4',
+      clientId: 'c-2',
+      name: 'Omega-3 (IFOS Onaylı Trigliserid Form)',
+      dose: '2000 mg EPA + DHA',
+      timing: 'with_lunch',
+      clinicalReason: 'Yüksek TG/HDL aterojenik oranı (4.78) düşürme protokolü',
+      durationWeeks: 16,
+    },
+  ];
+
+  const glp1Profiles: Glp1BariatricProfile[] = [
+    {
+      clientId: 'c-2',
+      stage: 'glp1_titration',
+      agentName: 'Semaglutid (Ozempic)',
+      weeklyDoseMg: 1.0,
+      injectionDay: 'Pazar',
+      giSymptomScore: 2,
+      bristolStoolType: 2,
+      resistanceTrainingDays: 2,
+      notes: 'Enjeksiyon sonrası ilk 36 saatte hafif bulantı; öğün hacmi küçültüldü, protein 1.5 g/kg tabanında tutuluyor.',
+    },
+    {
+      clientId: 'c-1',
+      stage: 'none',
+      agentName: 'Medikal Beslenme + Metformin',
+      weeklyDoseMg: 0,
+      injectionDay: '—',
+      giSymptomScore: 1,
+      bristolStoolType: 4,
+      resistanceTrainingDays: 3,
+      notes: 'Haftada 3 gün pilates/direnç egzersizi ile yağsız kas kütlesi korunuyor.',
+    },
+  ];
+
+  return {
+    clients,
+    measurements,
+    plans,
+    consultations,
+    activity,
+    foods: [...SEED_FOODS],
+    labs,
+    medications,
+    supplements,
+    glp1Profiles,
+  };
 
   function foodRef(foodId: string, portions: number, alternative?: string) {
     const item = SEED_FOODS.find((f) => f.id === foodId) ?? SEED_FOODS[0];

@@ -18,9 +18,13 @@ import {
   ClientStatus,
   Consultation,
   FoodItem,
+  Glp1BariatricProfile,
+  LabPanel,
   MealPlan,
   Measurement,
+  MedicationEntry,
   PlanStatus,
+  SupplementProtocolItem,
   Tone,
 } from '../../domain/diet.models';
 import { AuthStore } from '../auth/auth-store';
@@ -39,6 +43,10 @@ export interface DietData {
   readonly consultations: Consultation[];
   readonly activity: ActivityEntry[];
   readonly foods?: FoodItem[];
+  readonly labs?: LabPanel[];
+  readonly medications?: MedicationEntry[];
+  readonly supplements?: SupplementProtocolItem[];
+  readonly glp1Profiles?: Glp1BariatricProfile[];
 }
 
 /** A brand-new practice starts with no client records, plus the clinical food database. */
@@ -50,6 +58,10 @@ export function emptyDietData(): DietData {
     consultations: [],
     activity: [],
     foods: [...SEED_FOODS],
+    labs: [],
+    medications: [],
+    supplements: [],
+    glp1Profiles: [],
   };
 }
 
@@ -101,6 +113,10 @@ export class DietStore {
   readonly consultations = signal<Consultation[]>([]);
   readonly activity = signal<ActivityEntry[]>([]);
   readonly foods = signal<FoodItem[]>([...SEED_FOODS]);
+  readonly labs = signal<LabPanel[]>([]);
+  readonly medications = signal<MedicationEntry[]>([]);
+  readonly supplements = signal<SupplementProtocolItem[]>([]);
+  readonly glp1Profiles = signal<Glp1BariatricProfile[]>([]);
   /** True for the demo account, whose sample data is never saved. */
   readonly isSample = computed(() => this.workspace() === SAMPLE_WORKSPACE);
 
@@ -118,6 +134,10 @@ export class DietStore {
         consultations: this.consultations(),
         activity: this.activity(),
         foods: this.foods(),
+        labs: this.labs(),
+        medications: this.medications(),
+        supplements: this.supplements(),
+        glp1Profiles: this.glp1Profiles(),
       };
       const key = this.loadedWorkspace;
       if (key) saveWorkspacePart(key, 'diet', data);
@@ -139,6 +159,10 @@ export class DietStore {
     this.consultations.set(data.consultations ?? empty.consultations);
     this.activity.set(data.activity ?? empty.activity);
     this.foods.set(data.foods?.length ? data.foods : [...SEED_FOODS]);
+    this.labs.set(data.labs ?? []);
+    this.medications.set(data.medications ?? []);
+    this.supplements.set(data.supplements ?? []);
+    this.glp1Profiles.set(data.glp1Profiles ?? []);
   }
 
   readonly clientViews = computed<ClientView[]>(() => {
@@ -394,6 +418,79 @@ export class DietStore {
     if (!item) return;
     this.foods.update((list) => list.filter((f) => f.id !== foodId));
     this.log('delete', 'warning', 'Besin kütüphaneden silindi', item.name);
+  }
+
+  labsFor(clientId: string): LabPanel[] {
+    return this.labs()
+      .filter((l) => l.clientId === clientId)
+      .sort((a, b) => b.date.localeCompare(a.date));
+  }
+
+  saveLabPanel(panel: Omit<LabPanel, 'id'>): LabPanel {
+    const created: LabPanel = { ...panel, id: newId('lab') };
+    this.labs.update((list) => [created, ...list]);
+    this.log(
+      'biotech',
+      'info',
+      'Klinik kan tahlili kaydedildi',
+      `${this.clientName(panel.clientId)} · ${panel.date}`,
+    );
+    return created;
+  }
+
+  medicationsFor(clientId: string): MedicationEntry[] {
+    return this.medications().filter((m) => m.clientId === clientId);
+  }
+
+  addMedication(entry: Omit<MedicationEntry, 'id'>): void {
+    this.medications.update((list) => [...list, { ...entry, id: newId('med') }]);
+    this.log(
+      'medication',
+      'warning',
+      'İlaç etkileşim takibine eklendi',
+      `${this.clientName(entry.clientId)} · ${entry.name}`,
+    );
+  }
+
+  removeMedication(id: string): void {
+    this.medications.update((list) => list.filter((m) => m.id !== id));
+  }
+
+  supplementsFor(clientId: string): SupplementProtocolItem[] {
+    return this.supplements().filter((s) => s.clientId === clientId);
+  }
+
+  addSupplement(item: Omit<SupplementProtocolItem, 'id'>): void {
+    this.supplements.update((list) => [...list, { ...item, id: newId('sup') }]);
+    this.log(
+      'pill',
+      'positive',
+      'Takviye protokolü eklendi',
+      `${this.clientName(item.clientId)} · ${item.name}`,
+    );
+  }
+
+  removeSupplement(id: string): void {
+    this.supplements.update((list) => list.filter((s) => s.id !== id));
+  }
+
+  glp1ProfileFor(clientId: string): Glp1BariatricProfile | undefined {
+    return this.glp1Profiles().find((p) => p.clientId === clientId);
+  }
+
+  saveGlp1Profile(profile: Glp1BariatricProfile): void {
+    this.glp1Profiles.update((list) => {
+      const exists = list.some((p) => p.clientId === profile.clientId);
+      return exists
+        ? list.map((p) => (p.clientId === profile.clientId ? profile : p))
+        : [...list, profile];
+    });
+    this.log(
+      'vaccines',
+      'primary',
+      'GLP-1 / Bariatrik protokol güncellendi',
+      `${this.clientName(profile.clientId)} · ${profile.agentName}`,
+    );
   }
 
   /** Adds an entry to the activity feed. Also used by `PortalStore`. */

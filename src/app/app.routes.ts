@@ -58,6 +58,12 @@ export const routes: Routes = [
         loadComponent: () => import('./features/foods/foods-page').then((m) => m.FoodsPage),
       },
       {
+        path: 'clinical-lab',
+        title: 'Klinik analiz & biyobelirteç stüdyosu · OdivonDiet',
+        loadComponent: () =>
+          import('./features/clinical-lab/clinical-lab-page').then((m) => m.ClinicalLabPage),
+      },
+      {
         path: 'measurements',
         title: 'Ölçümler · OdivonDiet',
         loadComponent: () =>

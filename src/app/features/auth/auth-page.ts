@@ -636,47 +636,8 @@ const MEMBER_PROFILES: readonly DemoMemberProfile[] = [
                   </div>
                 }
 
-                @if (!isRegister && !isMember) {
-                  <div class="grid gap-3 sm:grid-cols-2">
-                    <label class="block">
-                      <span class="odv-label">Aktif klinik birim / branş</span>
-                      <select
-                        class="odv-input !py-2.5 text-xs"
-                        [ngModel]="specialty()"
-                        (ngModelChange)="specialty.set($event)"
-                        [ngModelOptions]="{ standalone: true }"
-                      >
-                        <option value="Obezite & Metabolik Beslenme">
-                          Obezite & Metabolik Beslenme
-                        </option>
-                        <option value="Sporcu & Performans Beslenmesi">
-                          Sporcu & Performans Beslenmesi
-                        </option>
-                        <option value="Endokrin, Diyabet & İnsülin Direnci">
-                          Endokrin, Diyabet & İnsülin Direnci
-                        </option>
-                        <option value="Bariatrik Cerrahi Beslenmesi">
-                          Bariatrik Cerrahi Beslenmesi
-                        </option>
-                      </select>
-                    </label>
-                    <label class="block">
-                      <span class="odv-label">Uzman Sicil / Oda No (İsteğe bağlı)</span>
-                      <input
-                        class="odv-input !py-2.5 text-xs"
-                        [ngModel]="licenseNo()"
-                        (ngModelChange)="licenseNo.set($event)"
-                        [ngModelOptions]="{ standalone: true }"
-                        placeholder="TR-DYT-10482"
-                      />
-                    </label>
-                  </div>
-                }
-
                 <label class="block">
-                  <span class="odv-label">{{
-                    isMember ? 'Danışan e-posta adresi' : 'Kurumsal / uzman e-posta'
-                  }}</span>
+                  <span class="odv-label">E-posta</span>
                   <span class="relative block">
                     <span
                       class="material-symbols-rounded pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 !text-lg text-slate-400"
@@ -755,15 +716,15 @@ const MEMBER_PROFILES: readonly DemoMemberProfile[] = [
                 </button>
               </form>
 
-              <div class="my-5 flex items-center gap-3 text-xs font-semibold text-slate-400">
-                <span class="h-px flex-1 bg-slate-200 dark:bg-slate-800"></span>
-                {{ isMember ? 'Hızlı Danışan Profili Seç' : 'Hızlı Klinik Uzman Profili Seç' }}
-                <span class="h-px flex-1 bg-slate-200 dark:bg-slate-800"></span>
+              <div class="my-6 flex items-center gap-3 text-xs font-semibold text-slate-400">
+                <span class="h-px flex-1 bg-slate-200 dark:bg-slate-800"></span>veya<span
+                  class="h-px flex-1 bg-slate-200 dark:bg-slate-800"
+                ></span>
               </div>
 
               <button
                 type="button"
-                class="odv-btn-secondary mb-3 !min-h-11 w-full !text-sm dark:!border-slate-800 dark:!bg-slate-900 dark:hover:!bg-slate-800"
+                class="odv-btn-secondary !min-h-12 w-full !text-sm dark:!border-slate-800 dark:!bg-slate-900 dark:hover:!bg-slate-800"
                 (click)="demo()"
               >
                 <span class="material-symbols-rounded !text-lg text-violet-500" aria-hidden="true"
@@ -772,63 +733,11 @@ const MEMBER_PROFILES: readonly DemoMemberProfile[] = [
               </button>
 
               @if (isMember) {
-                <div class="space-y-2">
-                  @for (mp of memberProfiles; track mp.clientId) {
-                    <button
-                      type="button"
-                      class="flex w-full items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-start transition hover:border-emerald-400 hover:bg-emerald-50/40 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-emerald-500/50 dark:hover:bg-emerald-950/20"
-                      (click)="demoMember(mp.clientId)"
-                    >
-                      <div class="min-w-0">
-                        <div class="flex items-center gap-2">
-                          <strong class="text-xs font-bold text-slate-900 dark:text-white">{{
-                            mp.name
-                          }}</strong>
-                          <span class="odv-chip">{{ mp.programLabel }}</span>
-                        </div>
-                        <p class="m-0 mt-0.5 truncate text-[11px] text-slate-500">
-                          {{ mp.metricNote }} · {{ mp.email }}
-                        </p>
-                      </div>
-                      <span
-                        class="material-symbols-rounded shrink-0 !text-lg text-emerald-600"
-                        aria-hidden="true"
-                        >login</span
-                      >
-                    </button>
-                  }
-                </div>
-                <p class="mt-4 text-center text-xs text-slate-500 dark:text-slate-400">
+                <p class="mt-6 text-center text-sm text-slate-500 dark:text-slate-400">
                   Portal hesabınızı diyetisyeniniz açar; davet e-postasındaki adresle giriş yapın.
                 </p>
               } @else {
-                <div class="space-y-2">
-                  @for (sp of specialistProfiles; track sp.id) {
-                    <button
-                      type="button"
-                      class="flex w-full items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-start transition hover:border-violet-400 hover:bg-violet-50/40 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-violet-500/50 dark:hover:bg-violet-950/20"
-                      (click)="demoSpecialist(sp)"
-                    >
-                      <div class="min-w-0">
-                        <div class="flex flex-wrap items-center gap-1.5">
-                          <strong class="text-xs font-bold text-slate-900 dark:text-white">{{
-                            sp.name
-                          }}</strong>
-                          <span class="odv-chip">{{ sp.specialty }}</span>
-                        </div>
-                        <p class="m-0 mt-0.5 truncate text-[11px] text-slate-500">
-                          {{ sp.practice }} · Sicil: {{ sp.licenseNo }}
-                        </p>
-                      </div>
-                      <span
-                        class="material-symbols-rounded shrink-0 !text-lg text-violet-600"
-                        aria-hidden="true"
-                        >clinical_notes</span
-                      >
-                    </button>
-                  }
-                </div>
-                <p class="mt-4 text-center text-xs text-slate-500 dark:text-slate-400">
+                <p class="mt-6 text-center text-sm text-slate-500 dark:text-slate-400">
                   {{ isRegister ? 'Zaten hesabınız var mı?' : 'Henüz hesabınız yok mu?' }}
                   <a
                     class="font-bold text-violet-600 hover:underline dark:text-violet-400"

@@ -13,6 +13,13 @@ interface MeasurementDraft {
   waistCm: number | null;
   hipCm: number | null;
   bodyFatPct: number | null;
+  muscleMassKg: number | null;
+  visceralFatRating: number | null;
+  bodyWaterPct: number | null;
+  ecwTbwRatio: number | null;
+  metabolicAge: number | null;
+  phaseAngleDeg: number | null;
+  neckCm: number | null;
   note: string;
 }
 
@@ -89,6 +96,36 @@ interface MeasurementDraft {
             <input class="odv-input tabular" type="number" step="0.1" [formField]="f.bodyFatPct" />
           </label>
         </div>
+
+        <div class="rounded-xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-900/50">
+          <span class="odv-eyebrow">InBody / Tanita Segmental BIA & Antropometri</span>
+          <div class="mt-3 grid gap-3 sm:grid-cols-3">
+            <label class="block">
+              <span class="odv-label">İskelet Kası SMM (kg)</span>
+              <input class="odv-input tabular" type="number" step="0.1" [formField]="f.muscleMassKg" placeholder="28,4" />
+            </label>
+            <label class="block">
+              <span class="odv-label">Visseral Yağ (1–20)</span>
+              <input class="odv-input tabular" type="number" step="1" [formField]="f.visceralFatRating" placeholder="8" />
+            </label>
+            <label class="block">
+              <span class="odv-label">Vücut Suyu TBW (%)</span>
+              <input class="odv-input tabular" type="number" step="0.1" [formField]="f.bodyWaterPct" placeholder="54,2" />
+            </label>
+            <label class="block">
+              <span class="odv-label">ECW/TBW Ödem Oranı</span>
+              <input class="odv-input tabular" type="number" step="0.001" [formField]="f.ecwTbwRatio" placeholder="0,380" />
+            </label>
+            <label class="block">
+              <span class="odv-label">Faz Açısı (°)</span>
+              <input class="odv-input tabular" type="number" step="0.1" [formField]="f.phaseAngleDeg" placeholder="6,1" />
+            </label>
+            <label class="block">
+              <span class="odv-label">Boyun Çevresi (cm)</span>
+              <input class="odv-input tabular" type="number" step="0.1" [formField]="f.neckCm" placeholder="34,5" />
+            </label>
+          </div>
+        </div>
         <label class="block">
           <span class="odv-label">Not</span>
           <textarea
@@ -148,6 +185,13 @@ export class MeasurementForm {
         waistCm: v.waistCm,
         hipCm: v.hipCm,
         bodyFatPct: v.bodyFatPct,
+        muscleMassKg: v.muscleMassKg,
+        visceralFatRating: v.visceralFatRating,
+        bodyWaterPct: v.bodyWaterPct,
+        ecwTbwRatio: v.ecwTbwRatio,
+        metabolicAge: v.metabolicAge,
+        phaseAngleDeg: v.phaseAngleDeg,
+        neckCm: v.neckCm,
         note: v.note.trim(),
       });
       this.notify.success('Ölçüm kaydedildi', `${this.store.clientName(v.clientId)} · ${v.weightKg} kg`);
@@ -163,6 +207,13 @@ export class MeasurementForm {
       waistCm: null,
       hipCm: null,
       bodyFatPct: null,
+      muscleMassKg: null,
+      visceralFatRating: null,
+      bodyWaterPct: null,
+      ecwTbwRatio: null,
+      metabolicAge: null,
+      phaseAngleDeg: null,
+      neckCm: null,
       note: '',
     };
   }
