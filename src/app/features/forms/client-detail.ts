@@ -1,6 +1,7 @@
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
+import { SubscriptionStore } from '../../core/billing/subscription-store';
 import { DietStore } from '../../core/data/diet-store';
 import { PortalStore } from '../../core/data/portal-store';
 import { isoDate } from '../../domain/diet-calc';
@@ -395,6 +396,7 @@ import { Notify } from '../../core/notify/notify';
 })
 export class ClientDetail {
   readonly qa = inject(QuickActions);
+  private readonly subs = inject(SubscriptionStore);
   private readonly store = inject(DietStore);
   private readonly portal = inject(PortalStore);
   private readonly notify = inject(Notify);
@@ -468,6 +470,15 @@ export class ClientDetail {
   async invite(): Promise<void> {
     const v = this.view();
     if (!v) return;
+    if (!this.subs.canUsePortal()) {
+      this.notify.warning(
+        'Danışan Portalı Profesyonel ve Klinik pakette aktiftir',
+        'Danışanlara portal daveti göndermek için paketinizi yükseltin.',
+      );
+      this.qa.close();
+      void this.router.navigateByUrl('/billing');
+      return;
+    }
     const confirmed = await this.notify.confirm({
       title: 'Portala davet edilsin mi?',
       text: `${v.client.email} adresine giriş bağlantısı gönderilir. Danışan planını, ölçümlerini ve görevlerini görür, size mesaj yazabilir.`,

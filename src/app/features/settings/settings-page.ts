@@ -1,10 +1,14 @@
 import { Component, computed, inject, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { environment } from '../../../environments/environment';
 import { DietApiService, PracticeSettings } from '../../core/api/diet-api.service';
 import { AuthStore } from '../../core/auth/auth-store';
+import { SubscriptionStore } from '../../core/billing/subscription-store';
 import { DietStore } from '../../core/data/diet-store';
 import { loadWorkspacePart, saveWorkspacePart } from '../../core/data/workspace';
 import { Notify } from '../../core/notify/notify';
+import { ClinicStaffRole, STAFF_ROLES, staffRoleById } from '../../domain/staff-rbac';
+import { Avatar } from '../../shared/ui/avatar';
 import { PageHeader } from '../../shared/ui/page-header';
 
 interface StoredSettings {
@@ -19,7 +23,7 @@ interface StoredSettings {
 
 @Component({
   selector: 'app-settings-page',
-  imports: [PageHeader],
+  imports: [PageHeader, FormsModule, Avatar],
   template: `
     <div class="animate-fade-up space-y-6">
       <app-page-header
@@ -207,15 +211,248 @@ interface StoredSettings {
           </section>
         </div>
       </div>
+
+      <!-- KLİNİK EKİP, KULLANICI AÇMA & ROL YETKİLENDİRME (RBAC) STÜDYOSU -->
+      <section
+        class="odv-card space-y-5 p-5 sm:p-6"
+        aria-label="Klinik kullanıcı açma ve rol yetkilendirme yönetimi"
+      >
+        <div class="flex flex-wrap items-start justify-between gap-4 border-b border-slate-100 pb-4 dark:border-slate-800">
+          <div>
+            <span class="odv-eyebrow text-violet-600">RBAC · Kullanıcı & Yetki Yönetimi</span>
+            <h2 class="odv-section-title mt-0.5">
+              Klinik Ekip Hesapları, Kullanıcı Açma ve Ekran Yetkilendirme
+            </h2>
+            <p class="mt-0.5 text-xs text-slate-500">
+              Kliniğinizdeki uzman diyetisyen, stajyer/asistan ve ön büro/sekreterya personeli için hesap
+              açın; paket koltuk limitinizi ve rol bazlı ekran kilitlerini yönetin.
+            </p>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="odv-badge odv-tone-info tabular">
+              Aktif Koltuk: {{ auth.activeStaffCount() }} / {{ seatLimitLabel() }}
+            </span>
+            <span class="odv-badge odv-tone-primary">
+              Sizin Aktif Rolünüz: {{ activeRoleDef().label }}
+            </span>
+          </div>
+        </div>
+
+        <!-- Canlı Rol Simülatörü (Ekran Engellemeyi Anında Test Et) -->
+        <div
+          class="rounded-2xl border border-violet-200 bg-violet-50/50 p-4 dark:border-violet-900/50 dark:bg-violet-950/20"
+        >
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <strong class="block text-xs font-extrabold text-violet-950 dark:text-violet-100">
+                Canlı Rol Yetkisi & Ekran Kilitleme Testi (Simülatör)
+              </strong>
+              <span class="text-[11px] text-slate-600 dark:text-slate-300">
+                Farklı bir rol seçtiğinizde sol menüdeki kilit ikonları (<span class="font-mono">lock</span>) ve ekran engellemeleri anında devreye girer.
+              </span>
+            </div>
+            <div class="flex flex-wrap gap-1.5">
+              @for (r of staffRoles; track r.id) {
+                <button
+                  type="button"
+                  (click)="switchActiveRole(r.id)"
+                  class="rounded-xl px-3 py-1.5 text-xs font-bold transition"
+                  [class]="
+                    auth.staffRole() === r.id
+                      ? 'bg-violet-600 text-white shadow-sm'
+                      : 'bg-white text-slate-700 hover:bg-violet-100 dark:bg-slate-800 dark:text-slate-200'
+                  "
+                >
+                  {{ r.label }}
+                </button>
+              }
+            </div>
+          </div>
+        </div>
+
+        <div class="grid gap-6 lg:grid-cols-[1fr_1.3fr]">
+          <!-- Sol: Yeni Kullanıcı Açma Formu -->
+          <form
+            class="space-y-3.5 rounded-2xl border border-slate-200 bg-slate-50/60 p-4 dark:border-slate-800 dark:bg-slate-900/50"
+            (submit)="createStaffUser($event)"
+          >
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-extrabold">Yeni Klinik Kullanıcısı Aç</h3>
+              <span class="text-[11px] font-semibold text-slate-400">Koltuk kontrolü aktif</span>
+            </div>
+
+            <label class="block">
+              <span class="odv-label">Ad Soyad & Unvan <b class="text-rose-500">*</b></span>
+              <input
+                class="odv-input"
+                [(ngModel)]="newStaffName"
+                name="staffName"
+                placeholder="Örn. Dyt. Selin Yılmaz / Sekreter Ayşe K."
+                required
+              />
+            </label>
+
+            <div class="grid gap-3 sm:grid-cols-2">
+              <label class="block">
+                <span class="odv-label">Kurumsal E-posta <b class="text-rose-500">*</b></span>
+                <input
+                  class="odv-input"
+                  type="email"
+                  [(ngModel)]="newStaffEmail"
+                  name="staffEmail"
+                  placeholder="selin@klinik.com"
+                  required
+                />
+              </label>
+              <label class="block">
+                <span class="odv-label">Geçici Giriş Şifresi</span>
+                <input
+                  class="odv-input font-mono text-xs"
+                  type="text"
+                  [(ngModel)]="newStaffPassword"
+                  name="staffPass"
+                  placeholder="Odivon2026!"
+                />
+              </label>
+            </div>
+
+            <div class="grid gap-3 sm:grid-cols-2">
+              <label class="block">
+                <span class="odv-label">Yetki Rolü (RBAC)</span>
+                <select class="odv-input" [(ngModel)]="newStaffRole" name="staffRole">
+                  @for (r of staffRoles; track r.id) {
+                    <option [ngValue]="r.id">{{ r.label }}</option>
+                  }
+                </select>
+              </label>
+              <label class="block">
+                <span class="odv-label">Klinik Birim / Görev</span>
+                <input
+                  class="odv-input"
+                  [(ngModel)]="newStaffSpecialty"
+                  name="staffSpec"
+                  placeholder="Örn. Sporcu Beslenmesi / Ön Büro"
+                />
+              </label>
+            </div>
+
+            <button type="submit" class="odv-btn-primary w-full justify-center">
+              <span class="material-symbols-rounded !text-base">person_add</span>
+              Kullanıcı Hesabını Aç ve Yetkilendir
+            </button>
+
+            <p class="text-[11px] text-slate-500">
+              Paket koltuk limitiniz dolduğunda yeni kullanıcı açılması engellenir;
+              <a href="/billing" class="font-bold text-violet-600 underline">Abonelik</a>
+              sayfasından 5 kullanıcılı Klinik Pakete geçebilirsiniz.
+            </p>
+          </form>
+
+          <!-- Sağ: Açılan Kullanıcılar ve Rol/Durum Yönetimi -->
+          <div class="space-y-4">
+            <h3 class="text-sm font-extrabold">
+              Kayıtlı Klinik Kullanıcıları ({{ auth.staffMembers().length }})
+            </h3>
+
+            <ul class="space-y-2.5">
+              @for (member of auth.staffMembers(); track member.id) {
+                <li
+                  class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-3.5 dark:border-slate-800 dark:bg-slate-900"
+                >
+                  <div class="flex items-center gap-3">
+                    <app-avatar [name]="member.name" size="sm" />
+                    <div>
+                      <div class="flex flex-wrap items-center gap-1.5">
+                        <strong class="text-sm">{{ member.name }}</strong>
+                        <span
+                          class="odv-badge text-[10px]"
+                          [class]="member.active ? 'odv-tone-positive' : 'odv-tone-danger'"
+                        >
+                          {{ member.active ? 'Aktif' : 'Pasif (Giriş Engelli)' }}
+                        </span>
+                      </div>
+                      <p class="text-xs text-slate-500">
+                        {{ member.email }} · {{ member.specialty }}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div class="flex flex-wrap items-center gap-2">
+                    <label class="sr-only" [attr.for]="'role-sel-' + member.id">Kullanıcı rolü</label>
+                    <select
+                      [id]="'role-sel-' + member.id"
+                      class="odv-input !w-auto !py-1.5 text-xs font-semibold"
+                      [ngModel]="member.role"
+                      (ngModelChange)="changeMemberRole(member.id, $event)"
+                    >
+                      @for (r of staffRoles; track r.id) {
+                        <option [ngValue]="r.id">{{ r.label }}</option>
+                      }
+                    </select>
+
+                    <button
+                      type="button"
+                      class="odv-btn-ghost !min-h-8 !px-2.5 text-xs"
+                      (click)="toggleMemberActive(member.id, member.name, member.active)"
+                    >
+                      {{ member.active ? 'Pasife Al' : 'Aktifleştir' }}
+                    </button>
+
+                    @if (auth.staffMembers().length > 1) {
+                      <button
+                        type="button"
+                        class="odv-icon-btn !size-8 text-rose-500"
+                        aria-label="Kullanıcıyı sil"
+                        (click)="deleteMember(member.id, member.name)"
+                      >
+                        <span class="material-symbols-rounded !text-base">delete</span>
+                      </button>
+                    }
+                  </div>
+                </li>
+              }
+            </ul>
+
+            <!-- Rol Yetki Matrisi Özeti -->
+            <div class="grid gap-2 sm:grid-cols-2">
+              @for (r of staffRoles; track r.id) {
+                <div class="rounded-xl border border-slate-100 bg-slate-50/70 p-3 text-xs dark:border-slate-800 dark:bg-slate-800/40">
+                  <div class="flex items-center justify-between">
+                    <strong class="font-extrabold text-slate-800 dark:text-white">{{ r.label }}</strong>
+                    <span class="odv-badge odv-tone-neutral text-[10px]">
+                      {{ r.allowedPaths.length }} ekran açık
+                    </span>
+                  </div>
+                  <p class="mt-1 text-[11px] leading-relaxed text-slate-500">{{ r.description }}</p>
+                </div>
+              }
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
   `,
 })
 export class SettingsPage {
   readonly auth = inject(AuthStore);
+  readonly subs = inject(SubscriptionStore);
   readonly diet = inject(DietStore);
   private readonly api = inject(DietApiService, { optional: true });
   private readonly notify = inject(Notify);
   readonly apiBaseUrl = environment.apiBaseUrl;
+  readonly staffRoles = STAFF_ROLES;
+
+  newStaffName = '';
+  newStaffEmail = '';
+  newStaffPassword = '';
+  newStaffRole: ClinicStaffRole = 'dietitian';
+  newStaffSpecialty = 'Klinik Beslenme Uzmanı';
+
+  readonly activeRoleDef = computed(() => staffRoleById(this.auth.staffRole()));
+  readonly seatLimitLabel = computed(() => {
+    const seats = this.subs.state()?.plan.seats;
+    return seats ? `${seats} Koltuk (${this.subs.state()?.plan.name})` : '5 Koltuk (Demo/Klinik)';
+  });
 
   private readonly stored = loadWorkspacePart<StoredSettings>(this.diet.workspace(), 'settings');
 
@@ -345,5 +582,69 @@ export class SettingsPage {
     a.click();
     URL.revokeObjectURL(url);
     this.notify.success('Klinik veri yedeği (JSON) indirildi.');
+  }
+
+  switchActiveRole(role: ClinicStaffRole): void {
+    this.auth.setStaffRole(role);
+    const def = staffRoleById(role);
+    this.notify.info(
+      `Aktif rol değiştirildi: ${def.label}`,
+      `Sol menüdeki kilit ikonları ve ekran erişim yetkileri bu role göre güncellendi.`,
+    );
+  }
+
+  createStaffUser(event: Event): void {
+    event.preventDefault();
+    const name = this.newStaffName.trim();
+    const email = this.newStaffEmail.trim().toLowerCase();
+    if (!name || !email.includes('@')) {
+      this.notify.warning('Eksik bilgi', 'Kullanıcı adı ve geçerli bir e-posta adresi girin.');
+      return;
+    }
+    if (this.auth.staffMembers().some((m) => m.email.toLowerCase() === email)) {
+      this.notify.warning('E-posta kullanımda', 'Bu e-posta adresiyle kayıtlı bir kullanıcı zaten var.');
+      return;
+    }
+    if (!this.subs.canAddStaffSeat(this.auth.activeStaffCount())) {
+      const plan = this.subs.state()?.plan;
+      this.notify.warning(
+        'Paket kullanıcı (koltuk) limitine ulaştınız',
+        `${plan?.name ?? 'Mevcut'} paketiniz ${plan?.seats ?? 1} diyetisyen/personel hesabına izin veriyor. 5 kullanıcılı Klinik Pakete geçin.`,
+      );
+      return;
+    }
+    const created = this.auth.addStaffMember({
+      name,
+      email,
+      role: this.newStaffRole,
+      specialty: this.newStaffSpecialty,
+      tempPassword: this.newStaffPassword || 'Odivon2026!',
+    });
+    this.newStaffName = '';
+    this.newStaffEmail = '';
+    this.newStaffPassword = '';
+    this.notify.success(
+      'Yeni kullanıcı açıldı ve yetkilendirildi',
+      `${created.name} (${staffRoleById(created.role).label}) artık ${created.email} ile giriş yapabilir.`,
+    );
+  }
+
+  changeMemberRole(id: string, role: ClinicStaffRole): void {
+    this.auth.updateStaffMemberRole(id, role);
+    this.notify.success('Kullanıcı rolü güncellendi', staffRoleById(role).label);
+  }
+
+  toggleMemberActive(id: string, name: string, currentlyActive: boolean): void {
+    this.auth.toggleStaffMemberActive(id);
+    if (currentlyActive) {
+      this.notify.warning('Kullanıcı pasife alındı', `${name} artık panele giriş yapamaz.`);
+    } else {
+      this.notify.success('Kullanıcı aktifleştirildi', `${name} tekrar panele giriş yapabilir.`);
+    }
+  }
+
+  deleteMember(id: string, name: string): void {
+    this.auth.removeStaffMember(id);
+    this.notify.info('Kullanıcı silindi', name);
   }
 }

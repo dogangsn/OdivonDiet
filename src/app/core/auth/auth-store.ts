@@ -1,5 +1,11 @@
 import { Injectable, Injector, computed, inject, signal } from '@angular/core';
 import type { UserRole } from '../../domain/portal.models';
+import {
+  ClinicStaffMember,
+  ClinicStaffRole,
+  DEFAULT_STAFF_SEED,
+  isPathAllowedForStaffRole,
+} from '../../domain/staff-rbac';
 import { SAMPLE_WORKSPACE } from '../data/workspace';
 import { FirebaseIdentity } from './firebase-identity';
 
@@ -13,6 +19,8 @@ export interface AppSession {
   readonly workspaceMode?: string;
   /** Missing on sessions saved before the member portal existed; treated as `dietitian`. */
   readonly role?: UserRole;
+  /** Granular clinic staff role for RBAC screen authorization (`owner` by default). */
+  readonly staffRole?: ClinicStaffRole;
   /** Only for members: the client record this login belongs to. */
   readonly clientId?: string;
   /** The demo account with sample data. Real accounts start with an empty practice. */
@@ -69,14 +77,25 @@ export class AuthStore {
   private readonly injector = inject(Injector);
   private readonly storageKey = 'odivon:session';
   private readonly pendingKey = 'odivon:pending-verification';
+  private readonly staffStorageKey = 'odivon:staff';
   readonly session = signal<AppSession | null>(this.restore());
   readonly pendingVerification = signal<PendingVerification | null>(this.restorePending());
+  readonly staffMembers = signal<ClinicStaffMember[]>(this.restoreStaff());
   readonly isAuthenticated = computed(() => this.session() !== null);
   readonly role = computed<UserRole | null>(() => {
     const session = this.session();
     return session ? (session.role ?? 'dietitian') : null;
   });
+  readonly staffRole = computed<ClinicStaffRole>(() => this.session()?.staffRole ?? 'owner');
+  readonly activeStaffCount = computed(
+    () => this.staffMembers().filter((m) => m.active).length,
+  );
   readonly homePath = computed(() => HOME_BY_ROLE[this.role() ?? 'dietitian']);
+
+  canAccessPath(path: string): boolean {
+    if (this.role() === 'member') return path.startsWith('/portal');
+    return isPathAllowedForStaffRole(this.staffRole(), path);
+  }
 
   async signIn(
     email: string,
@@ -84,19 +103,28 @@ export class AuthStore {
     specialty?: string,
     licenseNo?: string,
   ): Promise<void> {
+    const matchedStaff = this.staffMembers().find(
+      (s) => s.email.toLowerCase() === email.trim().toLowerCase(),
+    );
+    if (matchedStaff && !matchedStaff.active) {
+      throw new PortalAccessError(
+        'Bu kullanıcı hesabı klinik yöneticisi tarafından pasife alınmıştır.',
+      );
+    }
     if (!this.identity.configured) {
       const pending = this.pendingVerification();
       if (pending?.demo && pending.email.toLowerCase() === email.toLowerCase()) {
         throw new EmailNotVerifiedError('E-posta adresiniz henüz doğrulanmadı.');
       }
       this.persist({
-        name: email.split('@')[0] || 'Odivon Kullanıcısı',
+        name: matchedStaff?.name || email.split('@')[0] || 'Odivon Kullanıcısı',
         email,
         demo: true,
         sample: false,
-        specialty: specialty || 'Obezite & Metabolik Beslenme',
+        specialty: matchedStaff?.specialty || specialty || 'Obezite & Metabolik Beslenme',
         licenseNo: licenseNo || 'TR-DYT-10482',
         role: 'dietitian',
+        staffRole: matchedStaff?.role ?? 'owner',
       });
       return;
     }
@@ -342,7 +370,9 @@ export class AuthStore {
 
   /** Updates the signed-in dietitian's clinic/profile metadata and persists it to the session. */
   updateProfile(
-    patch: Partial<Pick<AppSession, 'name' | 'practice' | 'specialty' | 'licenseNo' | 'workspaceMode'>>,
+    patch: Partial<
+      Pick<AppSession, 'name' | 'practice' | 'specialty' | 'licenseNo' | 'workspaceMode' | 'staffRole'>
+    >,
   ): void {
     const current = this.session();
     if (!current) return;
@@ -350,6 +380,75 @@ export class AuthStore {
       ...current,
       ...patch,
     });
+  }
+
+  /** Switches the active RBAC staff role for the current dietitian session. */
+  setStaffRole(staffRole: ClinicStaffRole): void {
+    this.updateProfile({ staffRole });
+  }
+
+  /** Creates a new clinic staff user and assigns their RBAC role. */
+  addStaffMember(input: {
+    name: string;
+    email: string;
+    role: ClinicStaffRole;
+    specialty?: string;
+    tempPassword?: string;
+  }): ClinicStaffMember {
+    const member: ClinicStaffMember = {
+      id: `staff-${Date.now().toString(36)}`,
+      name: input.name.trim(),
+      email: input.email.trim().toLowerCase(),
+      role: input.role,
+      specialty: input.specialty?.trim() || 'Klinik Beslenme Ekibi',
+      active: true,
+      createdAt: new Date().toISOString().slice(0, 10),
+      tempPassword: input.tempPassword?.trim() || undefined,
+    };
+    const next = [...this.staffMembers(), member];
+    this.persistStaff(next);
+    return member;
+  }
+
+  updateStaffMemberRole(id: string, role: ClinicStaffRole): void {
+    const next = this.staffMembers().map((m) => (m.id === id ? { ...m, role } : m));
+    this.persistStaff(next);
+    const current = this.session();
+    const target = next.find((m) => m.id === id);
+    if (current && target && current.email.toLowerCase() === target.email.toLowerCase()) {
+      this.setStaffRole(role);
+    }
+  }
+
+  toggleStaffMemberActive(id: string): void {
+    const next = this.staffMembers().map((m) => (m.id === id ? { ...m, active: !m.active } : m));
+    this.persistStaff(next);
+  }
+
+  removeStaffMember(id: string): void {
+    if (this.staffMembers().length <= 1) return;
+    const next = this.staffMembers().filter((m) => m.id !== id);
+    this.persistStaff(next);
+  }
+
+  private persistStaff(list: ClinicStaffMember[]): void {
+    try {
+      localStorage.setItem(this.staffStorageKey, JSON.stringify(list));
+    } catch {
+      // keep in memory
+    }
+    this.staffMembers.set(list);
+  }
+
+  private restoreStaff(): ClinicStaffMember[] {
+    try {
+      const parsed = JSON.parse(
+        localStorage.getItem(this.staffStorageKey) ?? 'null',
+      ) as ClinicStaffMember[] | null;
+      return parsed && parsed.length ? parsed : [...DEFAULT_STAFF_SEED];
+    } catch {
+      return [...DEFAULT_STAFF_SEED];
+    }
   }
 
   /** Loaded on demand so the data stores and demo seed stay out of the login bundle. */

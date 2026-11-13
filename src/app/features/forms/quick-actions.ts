@@ -1,4 +1,9 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, inject, signal } from '@angular/core';
+import { Router } from '@angular/router';
+import { AuthStore } from '../../core/auth/auth-store';
+import { SubscriptionStore } from '../../core/billing/subscription-store';
+import { Notify } from '../../core/notify/notify';
+import { isQuickActionAllowedForStaffRole, staffRoleById } from '../../domain/staff-rbac';
 
 export type QuickActionKind =
   | 'client-new'
@@ -28,6 +33,10 @@ export interface QuickAction {
  */
 @Injectable({ providedIn: 'root' })
 export class QuickActions {
+  private readonly subs = inject(SubscriptionStore);
+  private readonly auth = inject(AuthStore);
+  private readonly notify = inject(Notify);
+  private readonly router = inject(Router, { optional: true });
   readonly state = signal<QuickAction | null>(null);
 
   open(
@@ -37,6 +46,36 @@ export class QuickActions {
     date?: string,
     time?: string,
   ): void {
+    if (this.subs.expired()) {
+      this.notify.warning(
+        'Abonelik veya deneme süreniz doldu',
+        'Yeni işlem yapmak için abonelik sayfasından bir paket seçin.',
+      );
+      void this.router?.navigateByUrl('/billing');
+      return;
+    }
+
+    if (kind === 'task' && !this.subs.canUsePortal()) {
+      this.notify.warning(
+        'Danışan Portalı Profesyonel ve Klinik pakette aktiftir',
+        'Görev atamak için paketinizi yükseltin.',
+      );
+      void this.router?.navigateByUrl('/billing');
+      return;
+    }
+
+    if (
+      kind !== 'consultation-complete' &&
+      !isQuickActionAllowedForStaffRole(this.auth.staffRole(), kind)
+    ) {
+      const roleDef = staffRoleById(this.auth.staffRole());
+      this.notify.warning(
+        'Rol yetkisi kısıtlı',
+        `"${roleDef.label}" rolü bu işlemi gerçekleştiremez.`,
+      );
+      return;
+    }
+
     this.state.set({ kind, clientId, consultationId, date, time });
   }
 

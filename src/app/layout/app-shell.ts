@@ -8,6 +8,7 @@ import { I18nStore, SupportedLang } from '../core/i18n/i18n';
 import { ThemeStore } from '../core/theme/theme-store';
 import { PRODUCT_NAVIGATION } from '../domain/domain-navigation';
 import { PRODUCT } from '../domain/product-manifest';
+import { staffRoleById } from '../domain/staff-rbac';
 import { QuickActionHost } from '../features/forms/quick-action-host';
 import { QuickActions } from '../features/forms/quick-actions';
 import { Avatar } from '../shared/ui/avatar';
@@ -93,7 +94,14 @@ import { VersionBadge } from '../shared/ui/version-badge';
                       >{{ item.icon }}</span
                     >
                     <span class="flex-1">{{ item.label }}</span>
-                    @if (badge(item.path); as count) {
+                    @if (isNavLocked(item.path)) {
+                      <span
+                        class="material-symbols-rounded !text-base text-rose-500"
+                        aria-label="Kilitli ekran"
+                        title="Paket veya rol kısıtlaması"
+                        >lock</span
+                      >
+                    } @else if (badge(item.path); as count) {
                       <span
                         class="tabular rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-500 group-hover:bg-white dark:bg-slate-800 dark:text-slate-300"
                         >{{ count }}</span
@@ -407,9 +415,13 @@ export class AppShell {
   });
 
   readonly userSubtitle = computed(() => {
-    const s = this.auth.session();
-    return s?.practice || s?.email || '';
+    const roleLabel = staffRoleById(this.auth.staffRole()).label;
+    return roleLabel;
   });
+
+  isNavLocked(path: string): boolean {
+    return this.subs.isRouteLocked(path) || !this.auth.canAccessPath(path);
+  }
 
   private readonly badges = computed<Record<string, number>>(() => ({
     '/clients': this.store.activeClients().length,

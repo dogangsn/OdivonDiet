@@ -37,14 +37,17 @@ export class SubscriptionStore {
     return workspaceKeyFor(session);
   });
   readonly subscription = signal<Subscription | null>(null);
+  readonly sandboxOverride = signal<Subscription | null>(null);
 
   readonly state = computed<SubscriptionState | null>(() => {
-    const subscription = this.subscription();
+    const subscription = this.sandboxOverride() ?? this.subscription();
     return subscription ? subscriptionState(subscription, this.now()) : null;
   });
   readonly expired = computed(() => this.state()?.expired ?? false);
-  /** The sample account shows every feature and no billing. */
-  readonly isSample = computed(() => isSampleSession(this.auth.session()));
+  /** The sample account shows every feature and no billing unless sandbox simulation is enabled. */
+  readonly isSample = computed(
+    () => isSampleSession(this.auth.session()) && this.sandboxOverride() === null,
+  );
 
   constructor() {
     this.load(untracked(this.owner));
@@ -61,6 +64,80 @@ export class SubscriptionStore {
   canAddClient(activeClients: number): boolean {
     const state = this.state();
     return !state || canAddClient(state.plan, activeClients);
+  }
+
+  /** Whether the package includes the Member Portal (`/messages`, `/requests`, `/tasks`, invitations). */
+  canUsePortal(): boolean {
+    const state = this.state();
+    return !state || state.plan.portal;
+  }
+
+  /** Whether the package allows one more active dietitian/staff seat. */
+  canAddStaffSeat(activeSeats: number): boolean {
+    const state = this.state();
+    return !state || activeSeats < state.plan.seats;
+  }
+
+  /** Returns whether a route path is locked by subscription expiry or package tier (`starter` portal lock). */
+  isRouteLocked(path: string): boolean {
+    const clean = '/' + (path.split('?')[0]?.replace(/^\/+/, '').split('/')[0] ?? 'overview');
+    if (this.expired()) {
+      return clean !== '/billing' && clean !== '/settings';
+    }
+    if (!this.canUsePortal() && ['/messages', '/requests', '/tasks'].includes(clean)) {
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Live test/simulation helper so the clinic owner can verify day counting, expiry screen locking,
+   * Starter package portal restriction, and Clinic 5-seat limit at any time.
+   */
+  simulateScenario(
+    scenario: 'trial_14' | 'trial_2' | 'expired' | 'starter_active' | 'clinic_active' | 'reset',
+  ): void {
+    const now = new Date();
+    const dayMs = 86_400_000;
+    if (scenario === 'reset') {
+      this.sandboxOverride.set(null);
+      return;
+    }
+    if (scenario === 'trial_14') {
+      this.sandboxOverride.set(createTrial(now));
+      return;
+    }
+    if (scenario === 'trial_2') {
+      const start = new Date(now.getTime() - 12 * dayMs);
+      const end = new Date(now.getTime() + 2 * dayMs);
+      this.sandboxOverride.set({
+        ...createTrial(start),
+        trialStartedAt: start.toISOString(),
+        trialEndsAt: end.toISOString(),
+      });
+      return;
+    }
+    if (scenario === 'expired') {
+      const start = new Date(now.getTime() - 16 * dayMs);
+      const end = new Date(now.getTime() - 2 * dayMs);
+      this.sandboxOverride.set({
+        ...createTrial(start),
+        trialStartedAt: start.toISOString(),
+        trialEndsAt: end.toISOString(),
+      });
+      return;
+    }
+    if (scenario === 'starter_active') {
+      this.sandboxOverride.set(
+        applyPayment(createTrial(now), 'starter', 'monthly', 'SIM-STARTER', now),
+      );
+      return;
+    }
+    if (scenario === 'clinic_active') {
+      this.sandboxOverride.set(
+        applyPayment(createTrial(now), 'clinic', 'yearly', 'SIM-CLINIC', now),
+      );
+    }
   }
 
   /**

@@ -43,18 +43,92 @@ interface Checkout {
 
       @if (subs.isSample()) {
         <section
-          class="odv-card flex items-start gap-3 border-amber-200 bg-amber-50/60 p-5 dark:border-amber-900 dark:bg-amber-950/30"
+          class="odv-card flex flex-wrap items-center justify-between gap-3 border-amber-200 bg-amber-50/60 p-5 dark:border-amber-900 dark:bg-amber-950/30"
         >
-          <span class="material-symbols-rounded text-amber-600" aria-hidden="true">science</span>
-          <div class="text-sm">
-            <strong class="block">Demo hesabındasınız</strong>
-            <span class="text-slate-600 dark:text-slate-300"
-              >Ücretsiz hesap açtığınızda boş bir muayenehaneyle başlarsınız ve {{ trialDays }} gün
-              boyunca Profesyonel paketin tamamını denersiniz.</span
-            >
+          <div class="flex items-start gap-3">
+            <span class="material-symbols-rounded text-amber-600" aria-hidden="true">science</span>
+            <div class="text-sm">
+              <strong class="block">Demo hesabındasınız</strong>
+              <span class="text-slate-600 dark:text-slate-300"
+                >Ücretsiz hesap açtığınızda boş bir muayenehaneyle başlarsınız ve {{ trialDays }} gün
+                boyunca Profesyonel paketin tamamını denersiniz.</span
+              >
+            </div>
           </div>
+          <button
+            type="button"
+            class="odv-btn-soft !min-h-9 text-xs"
+            (click)="runScenario('trial_14')"
+          >
+            Gün Sayacı & Kilitleme Simülatörünü Başlat
+          </button>
         </section>
       }
+
+      <!-- CANLI ABONELİK, GÜN SAYACI & EKRAN KİLİDİ DOĞRULAMA PANELİ -->
+      <section
+        class="odv-card border-violet-200/80 p-4 sm:p-5 dark:border-violet-900/50"
+        aria-label="Abonelik gün sayacı ve ekran kilitleme simülatörü"
+      >
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <span class="odv-eyebrow text-violet-600">Canlı Test & Doğrulama</span>
+            <h2 class="text-sm font-extrabold">
+              Gün Sayma, Süre Bitimi Ekran Kilitleme ve Paket Limitlerini Canlı Test Edin
+            </h2>
+            <p class="text-xs text-slate-500">
+              Aşağıdaki senaryolardan birine tıkladığınızda sol menüdeki gün sayacı, kilit ikonları ve
+              ekran engellemeleri anında devreye girer.
+            </p>
+          </div>
+          <div class="flex flex-wrap gap-1.5">
+            <button
+              type="button"
+              class="rounded-xl bg-violet-50 px-3 py-1.5 text-xs font-bold text-violet-700 hover:bg-violet-100 dark:bg-violet-950/60 dark:text-violet-200"
+              (click)="runScenario('trial_14')"
+            >
+              14 Gün Deneme
+            </button>
+            <button
+              type="button"
+              class="rounded-xl bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-800 hover:bg-amber-100 dark:bg-amber-950/60 dark:text-amber-200"
+              (click)="runScenario('trial_2')"
+            >
+              Son 2 Gün Uyarısı
+            </button>
+            <button
+              type="button"
+              class="rounded-xl bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 dark:bg-rose-950/60 dark:text-rose-200"
+              (click)="runScenario('expired')"
+            >
+              Süre Bitti (0 Gün · Ekranları Kilitle)
+            </button>
+            <button
+              type="button"
+              class="rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200"
+              (click)="runScenario('starter_active')"
+            >
+              Başlangıç Paketi (Portal Kilitli · 1 Koltuk)
+            </button>
+            <button
+              type="button"
+              class="rounded-xl bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:text-emerald-200"
+              (click)="runScenario('clinic_active')"
+            >
+              Klinik Paket (5 Koltuk · Sınırsız)
+            </button>
+            @if (subs.sandboxOverride()) {
+              <button
+                type="button"
+                class="rounded-xl border border-slate-200 px-2.5 py-1.5 text-xs font-bold text-slate-500 hover:bg-slate-100 dark:border-slate-700"
+                (click)="runScenario('reset')"
+              >
+                Sıfırla
+              </button>
+            }
+          </div>
+        </div>
+      </section>
 
       @if (subs.state(); as s) {
         @if (s.expired) {
@@ -148,9 +222,9 @@ interface Checkout {
               </dd>
             </div>
             <div class="rounded-xl bg-slate-50 p-3 dark:bg-slate-800/60">
-              <dt class="text-xs text-slate-500">Diyetisyen hesabı</dt>
+              <dt class="text-xs text-slate-500">Diyetisyen / ekip hesabı</dt>
               <dd class="tabular mt-1 text-lg font-extrabold">
-                1<span class="text-sm font-semibold text-slate-400"> / {{ s.plan.seats }}</span>
+                {{ auth.activeStaffCount() }}<span class="text-sm font-semibold text-slate-400"> / {{ s.plan.seats }}</span>
               </dd>
             </div>
           </dl>
@@ -379,7 +453,7 @@ export class BillingPage {
   private readonly diet = inject(DietStore);
   private readonly notify = inject(Notify);
   readonly payments = inject(PaymentGateway);
-  private readonly auth = inject(AuthStore);
+  readonly auth = inject(AuthStore);
   private readonly sanitizer = inject(DomSanitizer);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
@@ -556,5 +630,31 @@ export class BillingPage {
     if (!ok) return;
     this.subs.requestPlan(plan.id, this.cycle());
     this.notify.success('Paket talebiniz alındı', 'Ödeme bağlantısı e-posta ile gönderilecek.');
+  }
+
+  runScenario(
+    scenario: 'trial_14' | 'trial_2' | 'expired' | 'starter_active' | 'clinic_active' | 'reset',
+  ): void {
+    this.subs.simulateScenario(scenario);
+    if (scenario === 'expired') {
+      this.notify.warning(
+        'Süre sonu ekran kilidi aktif (0 gün kaldı)',
+        'Abonelik ve Ayarlar dışındaki tüm ekranlar ve hızlı işlemler kilitlendi.',
+      );
+    } else if (scenario === 'starter_active') {
+      this.notify.info(
+        'Başlangıç Paketi simülasyonu aktif',
+        'Danışan Portalı (/messages, /requests, /tasks) kilitlendi; kullanıcı koltuk limiti 1 olarak ayarlandı.',
+      );
+    } else if (scenario === 'clinic_active') {
+      this.notify.success(
+        'Klinik Paket simülasyonu aktif',
+        '5 kullanıcı koltuğu, sınırsız danışan ve tüm portal ekranları açıldı.',
+      );
+    } else if (scenario === 'trial_2') {
+      this.notify.warning('Son 2 gün deneme uyarısı aktif', 'Sayaç turuncu uyarı moduna geçti.');
+    } else if (scenario === 'trial_14') {
+      this.notify.info('14 günlük deneme sayacı başlatıldı', '');
+    }
   }
 }
