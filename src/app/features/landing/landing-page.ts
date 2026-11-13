@@ -4,14 +4,6 @@ import { Router, RouterLink } from '@angular/router';
 import { AuthStore } from '../../core/auth/auth-store';
 import { ThemeStore } from '../../core/theme/theme-store';
 import {
-  BillingCycle,
-  PLANS,
-  Plan,
-  TRIAL_DAYS,
-  formatTry,
-  yearlyTotal,
-} from '../../domain/billing';
-import {
   bmi,
   bmiBand,
   bmr,
@@ -29,7 +21,15 @@ import { ActivityLevel, ProgramType, Sex } from '../../domain/diet.models';
 import { PRODUCT } from '../../domain/product-manifest';
 import { VersionBadge } from '../../shared/ui/version-badge';
 
-type ShowcaseTab = 'studio' | 'biomarker' | 'glp1' | 'calendar';
+type ScreenId = 'overview' | 'plans' | 'clinical' | 'calendar' | 'portal';
+
+interface ScreenTab {
+  readonly id: ScreenId;
+  readonly icon: string;
+  readonly label: string;
+  readonly routeUrl: string;
+  readonly caption: string;
+}
 
 interface ModuleFeature {
   readonly badge: string;
@@ -41,9 +41,52 @@ interface ModuleFeature {
   readonly metricValue: string;
 }
 
+const SCREEN_TABS: readonly ScreenTab[] = [
+  {
+    id: 'overview',
+    icon: 'space_dashboard',
+    label: '1. Klinik Kokpit & Genel Bakış',
+    routeUrl: 'https://diet.odivon.com/overview',
+    caption:
+      'Aktif danışanlar, haftalık kilo değişimi, bugünün randevu ajandası ve klinik dikkat uyarıları tek ekranda.',
+  },
+  {
+    id: 'plans',
+    icon: 'restaurant_menu',
+    label: '2. Diyet & Kalori Stüdyosu',
+    routeUrl: 'https://diet.odivon.com/plans',
+    caption:
+      'BeBis 8 değişim grubu, Atwater (4-4-9) otomatik makro/lif hesabı, öğün reçeteleri ve 7 günlük alışveriş listesi.',
+  },
+  {
+    id: 'clinical',
+    icon: 'biotech',
+    label: '3. Tahlil, İlaç-Besin & GLP-1',
+    routeUrl: 'https://diet.odivon.com/clinical-lab',
+    caption:
+      'HOMA-IR, TG/HDL aterojenik indeks, İlaç×Besin×Tahlil çapraz etkileşim denetimi ve GLP-1 sarkopeni kas radarı.',
+  },
+  {
+    id: 'calendar',
+    icon: 'calendar_month',
+    label: '4. Görsel Takvim & InBody BIA',
+    routeUrl: 'https://diet.odivon.com/consultations',
+    caption:
+      '08:00–20:00 saat ızgaralı randevu takvimi ve InBody/Tanita segmental BIA (SMM kas, ECW/TBW ödem, faz açısı) analizi.',
+  },
+  {
+    id: 'portal',
+    icon: 'favorite',
+    label: '5. Danışan Mobil & Web Portalı',
+    routeUrl: 'https://diet.odivon.com/portal',
+    caption:
+      'Danışanlarınızın kendi telefon veya bilgisayarından günlük öğünlerini, ölçümlerini ve mesajlarını takip ettiği portal.',
+  },
+];
+
 const MANAGEMENT_MODULES: readonly ModuleFeature[] = [
   {
-    badge: '1. Menü Mühendisliği',
+    badge: 'Menü Mühendisliği',
     icon: 'restaurant_menu',
     title: 'Öğün Bazlı Diyet Stüdyosu & Otomatik Atwater Kalori Motoru',
     summary:
@@ -57,7 +100,7 @@ const MANAGEMENT_MODULES: readonly ModuleFeature[] = [
     metricValue: '3 dk / danışan',
   },
   {
-    badge: '2. Besin & Tarif Veritabanı',
+    badge: 'Besin & Tarif Bankası',
     icon: 'grocery',
     title: 'BeBis 8 Değişim Gruplu Besin, Ev Yemeği & Paketli Ürün Kütüphanesi',
     summary:
@@ -71,7 +114,7 @@ const MANAGEMENT_MODULES: readonly ModuleFeature[] = [
     metricValue: '8 BeBis Grubu',
   },
   {
-    badge: '3. Biyokimya & Tahlil Zekâsı',
+    badge: 'Biyokimya & Tahlil',
     icon: 'biotech',
     title: 'Kan Tahlili, Otomatik HOMA-IR & TG/HDL Aterojenik İndeks Analizi',
     summary:
@@ -85,7 +128,7 @@ const MANAGEMENT_MODULES: readonly ModuleFeature[] = [
     metricValue: '12+ Parametre',
   },
   {
-    badge: '4. Farmako-Beslenme (Rakiplerde Yok)',
+    badge: 'Farmako-Beslenme',
     icon: 'medication',
     title: 'İlaç × Beslenme Planı × Kan Tahlili Üçlü Çapraz Etkileşim Motoru',
     summary:
@@ -99,7 +142,7 @@ const MANAGEMENT_MODULES: readonly ModuleFeature[] = [
     metricValue: '%100 Otomatik',
   },
   {
-    badge: '5. GLP-1 & Bariatrik Koruma (Rakiplerde Yok)',
+    badge: 'GLP-1 & Bariatrik',
     icon: 'vaccines',
     title: 'GLP-1 (Ozempic / Mounjaro) & Bariatrik Sarkopeni / Kas Koruma Radarı',
     summary:
@@ -113,7 +156,7 @@ const MANAGEMENT_MODULES: readonly ModuleFeature[] = [
     metricValue: '≥1,6 g/kg Hedef',
   },
   {
-    badge: '6. Segmental BIA & Antropometri',
+    badge: 'Segmental BIA',
     icon: 'monitor_weight',
     title: 'InBody / Tanita Hücresel Vücut Kompozisyonu & Ödem (ECW/TBW) Takibi',
     summary:
@@ -127,7 +170,7 @@ const MANAGEMENT_MODULES: readonly ModuleFeature[] = [
     metricValue: '4 Klinik Formül',
   },
   {
-    badge: '7. Krono-Beslenme & Sirkadiyen Saat',
+    badge: 'Krono-Beslenme',
     icon: 'schedule',
     title: '24 Saatlik Post-Prandiyal Glisemik Eğri & Sirkadiyen Açlık Simülatörü',
     summary:
@@ -141,7 +184,7 @@ const MANAGEMENT_MODULES: readonly ModuleFeature[] = [
     metricValue: '%32 Tamponlama',
   },
   {
-    badge: '8. Görsel Ajanda & Danışan Portalı',
+    badge: 'Görsel Ajanda & Portal',
     icon: 'calendar_month',
     title: 'Haftalık Saat Izgaralı Randevu Takvimi & Çift Yönlü Danışan Portalı',
     summary:
@@ -163,76 +206,44 @@ const MANAGEMENT_MODULES: readonly ModuleFeature[] = [
     <div
       class="min-h-screen bg-slate-50 text-slate-900 selection:bg-violet-600 selection:text-white dark:bg-[#070b16] dark:text-white"
     >
-      <!-- ÜST SABİT NAVİGASYON BARI (Sol üstte marka + Giriş/Kayıt hızlı erişim & Sağda aksiyonlar) -->
+      <!-- TEK SATIR MODERN ÜST NAVİGASYON BARI -->
       <header
-        class="sticky top-0 z-50 border-b border-slate-200/80 bg-white/90 backdrop-blur-xl dark:border-slate-800/80 dark:bg-[#070b16]/90"
+        class="sticky top-0 z-50 border-b border-slate-200/80 bg-white/95 backdrop-blur-xl dark:border-slate-800/80 dark:bg-[#070b16]/95"
       >
         <div
-          class="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8"
+          class="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8"
         >
-          <!-- Sol Üst: Marka + Hızlı Giriş Yap / Kayıt Ol / Danışan Portalı -->
-          <div class="flex flex-wrap items-center gap-3 sm:gap-4">
-            <a routerLink="/" class="flex items-center gap-2.5">
-              <span
-                class="grid size-10 place-items-center rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-500/30"
-              >
-                <span class="material-symbols-rounded icon-fill !text-xl" aria-hidden="true"
-                  >nutrition</span
-                >
-              </span>
-              <div>
-                <strong class="block text-base font-extrabold leading-none tracking-tight">{{
-                  product.name
-                }}</strong>
-                <span class="text-[10px] font-bold uppercase tracking-wider text-violet-600 dark:text-violet-400">
-                  diet.odivon.com
-                </span>
-              </div>
-            </a>
-
-            <!-- Sol Üst Hızlı Giriş / Kayıt Hapları -->
-            <div
-              class="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-100/80 p-1 text-xs font-bold dark:border-slate-800 dark:bg-slate-900"
-              aria-label="Hızlı hesap işlemleri"
+          <!-- Sol: Marka Logosu -->
+          <a routerLink="/" class="flex shrink-0 items-center gap-3">
+            <span
+              class="grid size-10 place-items-center rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 text-white shadow-md shadow-violet-500/30"
             >
-              <a
-                routerLink="/login"
-                class="inline-flex items-center gap-1 rounded-lg bg-white px-3 py-1.5 text-slate-900 shadow-sm transition hover:text-violet-600 dark:bg-slate-800 dark:text-white dark:hover:text-violet-300"
+              <span class="material-symbols-rounded icon-fill !text-xl" aria-hidden="true"
+                >nutrition</span
               >
-                <span class="material-symbols-rounded !text-base text-violet-600" aria-hidden="true"
-                  >login</span
-                >
-                Giriş Yap
-              </a>
-              <a
-                routerLink="/register"
-                class="inline-flex items-center gap-1 rounded-lg bg-violet-600 px-3 py-1.5 text-white shadow-sm transition hover:bg-violet-500"
-              >
-                <span class="material-symbols-rounded !text-base" aria-hidden="true"
-                  >person_add</span
-                >
-                Kayıt Ol
-              </a>
-              <a
-                routerLink="/portal/login"
-                class="hidden items-center gap-1 rounded-lg px-2.5 py-1.5 text-emerald-700 transition hover:bg-emerald-50 sm:inline-flex dark:text-emerald-300 dark:hover:bg-emerald-950/50"
-              >
-                <span class="material-symbols-rounded !text-base" aria-hidden="true">favorite</span>
-                Danışan Girişi
-              </a>
+            </span>
+            <div>
+              <strong class="block text-base font-extrabold leading-tight tracking-tight">{{
+                product.name
+              }}</strong>
+              <span class="block text-[11px] font-semibold text-slate-400">
+                Klinik Beslenme Platformu
+              </span>
             </div>
-          </div>
+          </a>
 
-          <!-- Orta: Bölüm Bağlantıları -->
+          <!-- Orta: Sayfa İçi Navigasyon (Tek satır, ferah) -->
           <nav
-            class="hidden items-center gap-5 text-xs font-bold text-slate-600 xl:flex dark:text-slate-300"
+            class="hidden items-center gap-7 text-xs font-bold text-slate-600 lg:flex dark:text-slate-300"
             aria-label="Tanıtım bölümleri"
           >
-            <a href="#vitrin" class="transition hover:text-violet-600 dark:hover:text-violet-400"
-              >Canlı Kokpit</a
+            <a
+              href="#ekran-goruntuleri"
+              class="transition hover:text-violet-600 dark:hover:text-violet-400"
+              >Ürün Ekran Görüntüleri</a
             >
             <a href="#moduller" class="transition hover:text-violet-600 dark:hover:text-violet-400"
-              >8 Yönetim Modülü</a
+              >Klinik Modüller</a
             >
             <a
               href="#hesaplayici"
@@ -242,25 +253,31 @@ const MANAGEMENT_MODULES: readonly ModuleFeature[] = [
             <a
               href="#karsilastirma"
               class="transition hover:text-violet-600 dark:hover:text-violet-400"
-              >Rakiplerle Farkımız</a
-            >
-            <a href="#paketler" class="transition hover:text-violet-600 dark:hover:text-violet-400"
-              >Paketler & Fiyatlar</a
+              >Neden OdivonDiet?</a
             >
           </nav>
 
-          <!-- Sağ: Canlı Demo & Tema -->
-          <div class="flex items-center gap-2">
-            <button
-              type="button"
-              class="odv-btn-soft !min-h-9 !px-3 text-xs"
-              (click)="launchDietitianDemo()"
+          <!-- Sağ: Giriş Yap, Kayıt Ol, Danışan Portalı & Tema -->
+          <div class="flex shrink-0 items-center gap-2">
+            <a
+              routerLink="/portal/login"
+              class="hidden items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-50 md:inline-flex dark:text-emerald-300 dark:hover:bg-emerald-950/40"
             >
-              <span class="material-symbols-rounded !text-base" aria-hidden="true"
-                >play_circle</span
-              >
-              Canlı Demo Paneli Aç
-            </button>
+              <span class="material-symbols-rounded !text-base" aria-hidden="true">favorite</span>
+              Danışan Girişi
+            </a>
+            <a
+              routerLink="/login"
+              class="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-800 shadow-2xs transition hover:border-violet-300 hover:text-violet-600 dark:border-slate-800 dark:bg-slate-900 dark:text-white dark:hover:border-violet-700"
+            >
+              Giriş Yap
+            </a>
+            <a
+              routerLink="/register"
+              class="inline-flex items-center gap-1.5 rounded-xl bg-violet-600 px-3.5 py-2 text-xs font-bold text-white shadow-sm shadow-violet-500/25 transition hover:bg-violet-500"
+            >
+              Kayıt Ol
+            </a>
             <button
               type="button"
               class="odv-icon-btn !size-9"
@@ -276,8 +293,8 @@ const MANAGEMENT_MODULES: readonly ModuleFeature[] = [
       </header>
 
       <main>
-        <!-- HERO BÖLÜMÜ: Tanıtım + Ekran Üzeri Doğrudan Giriş/Kayıt Kartları + Etkileşimli Ürün Önizlemesi -->
-        <section class="relative overflow-hidden pb-16 pt-10 lg:pb-24 lg:pt-14">
+        <!-- HERO BÖLÜMÜ -->
+        <section class="relative overflow-hidden pb-12 pt-10 lg:pb-16 lg:pt-14">
           <div class="pointer-events-none absolute inset-0" aria-hidden="true">
             <div
               class="absolute -top-40 start-1/4 size-[34rem] rounded-full bg-violet-500/15 blur-[130px]"
@@ -288,437 +305,670 @@ const MANAGEMENT_MODULES: readonly ModuleFeature[] = [
           </div>
 
           <div class="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <div class="grid items-center gap-10 lg:grid-cols-[1.08fr_1fr]">
-              <!-- Sol: Değer Önerisi & Doğrudan Giriş / Kayıt / Demo Konsolu -->
-              <div>
+            <div class="mx-auto max-w-4xl text-center">
+              <div
+                class="inline-flex flex-wrap items-center justify-center gap-2 rounded-full border border-violet-200 bg-violet-50/90 px-4 py-1.5 text-xs font-bold text-violet-800 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-200"
+              >
+                <span class="size-2 rounded-full bg-emerald-500"></span>
+                Klinik Beslenme, Menü Mühendisliği, Biyobelirteç & Danışan Takip Sistemi
+              </div>
+
+              <h1
+                class="mt-5 text-3xl font-extrabold leading-[1.1] tracking-tight sm:text-5xl lg:text-[3.4rem]"
+              >
+                Diyetisyen kliniğinizi
+                <span
+                  class="bg-gradient-to-r from-violet-600 via-fuchsia-500 to-emerald-500 bg-clip-text text-transparent"
+                >
+                  bilimsel zekâyla
+                </span>
+                tek ekrandan yönetin.
+              </h1>
+
+              <p class="mx-auto mt-5 max-w-2xl text-base leading-7 text-slate-600 dark:text-slate-300">
+                Dağınık dosyalar ve manuel kalori hesabına son verin.
+                <strong>BeBis 8 değişim grubu</strong>, <strong>Atwater otomatik makro motoru</strong>,
+                <strong>HOMA-IR & kan tahlili analizi</strong>, <strong>İlaç–Besin etkileşim denetimi</strong>,
+                <strong>GLP-1 sarkopeni radarı</strong> ve <strong>görsel randevu ajandası</strong>
+                tek klinik platformda.
+              </p>
+
+              <!-- Ana Aksiyon Butonları (Giriş Yap / Kayıt Ol / Canlı Demo / Danışan Portalı) -->
+              <div
+                class="mt-8 flex flex-wrap items-center justify-center gap-3"
+                aria-label="Hızlı giriş ve kayıt seçenekleri"
+              >
+                <a
+                  routerLink="/register"
+                  class="odv-btn-primary !min-h-12 !px-6 !text-sm shadow-lg shadow-violet-600/25"
+                >
+                  <span class="material-symbols-rounded !text-lg" aria-hidden="true"
+                    >person_add</span
+                  >
+                  Yeni Uzman Kaydı Oluştur
+                </a>
+                <a
+                  routerLink="/login"
+                  class="odv-btn-secondary !min-h-12 !px-6 !text-sm dark:!border-slate-800 dark:!bg-slate-900"
+                >
+                  <span class="material-symbols-rounded !text-lg text-violet-600" aria-hidden="true"
+                    >login</span
+                  >
+                  Diyetisyen Girişi Yap
+                </a>
+                <button
+                  type="button"
+                  (click)="launchDietitianDemo()"
+                  class="odv-btn-soft !min-h-12 !px-5 !text-sm"
+                >
+                  <span class="material-symbols-rounded !text-lg" aria-hidden="true"
+                    >play_circle</span
+                  >
+                  Canlı Demo Paneli Aç
+                </button>
+                <a
+                  routerLink="/portal/login"
+                  class="inline-flex min-h-12 items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50/70 px-5 text-sm font-bold text-emerald-800 transition hover:bg-emerald-100/80 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-200"
+                >
+                  <span class="material-symbols-rounded !text-lg" aria-hidden="true">favorite</span>
+                  Danışan Portalı Girişi
+                </a>
+              </div>
+            </div>
+
+            <!-- ÜRÜN EKRAN GÖRÜNTÜLERİ VİTRİNİ (GERÇEK UYGULAMA PENCERESİ GÖRÜNÜMÜ) -->
+            <div id="ekran-goruntuleri" class="mt-12">
+              <!-- Ekran Seçici Sekmeler -->
+              <div
+                class="flex flex-wrap items-center justify-center gap-2"
+                role="tablist"
+                aria-label="Ürün ekran görüntüleri"
+              >
+                @for (tab of screenTabs; track tab.id) {
+                  <button
+                    type="button"
+                    role="tab"
+                    [attr.aria-selected]="activeScreen() === tab.id"
+                    class="inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-xs font-extrabold transition"
+                    [class]="
+                      activeScreen() === tab.id
+                        ? 'border-violet-600 bg-violet-600 text-white shadow-md shadow-violet-600/25'
+                        : 'border-slate-200 bg-white text-slate-700 hover:border-violet-300 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200'
+                    "
+                    (click)="activeScreen.set(tab.id)"
+                  >
+                    <span class="material-symbols-rounded !text-base" aria-hidden="true">{{
+                      tab.icon
+                    }}</span>
+                    {{ tab.label }}
+                  </button>
+                }
+              </div>
+
+              <!-- Tarayıcı Penceresi Çerçeveli Gerçek Ürün Ekran Görüntüsü -->
+              <div
+                class="mt-5 overflow-hidden rounded-3xl border border-slate-200/90 bg-white shadow-2xl shadow-slate-900/10 dark:border-slate-800 dark:bg-[#0b1020]"
+              >
+                <!-- Tarayıcı Üst Çubuğu -->
                 <div
-                  class="inline-flex flex-wrap items-center gap-2 rounded-full border border-violet-200 bg-violet-50/90 px-3.5 py-1.5 text-xs font-bold text-violet-800 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-200"
+                  class="flex items-center justify-between border-b border-slate-200 bg-slate-100/90 px-4 py-2.5 text-xs dark:border-slate-800 dark:bg-slate-900"
                 >
-                  <span class="size-2 rounded-full bg-emerald-500"></span>
-                  Türkiye'nin En Kapsamlı Klinik Beslenme, Menü Mühendisliği & Biyobelirteç Platformu
-                </div>
-
-                <h1
-                  class="mt-5 text-3xl font-extrabold leading-[1.1] tracking-tight sm:text-5xl lg:text-[3.25rem]"
-                >
-                  Diyetisyen kliniğinizi
-                  <span
-                    class="bg-gradient-to-r from-violet-600 via-fuchsia-500 to-emerald-500 bg-clip-text text-transparent"
+                  <div class="flex items-center gap-2">
+                    <span class="size-3 rounded-full bg-rose-400"></span>
+                    <span class="size-3 rounded-full bg-amber-400"></span>
+                    <span class="size-3 rounded-full bg-emerald-400"></span>
+                  </div>
+                  <div
+                    class="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1 font-mono text-[11px] text-slate-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300"
                   >
-                    bilimsel zekâyla
-                  </span>
-                  tek ekrandan yönetin.
-                </h1>
-
-                <p class="mt-5 max-w-2xl text-base leading-7 text-slate-600 dark:text-slate-300">
-                  Excel tablolarına, dağınık PDF listelerine ve manuel kalori hesabına son verin.
-                  <strong>BeBis 8 değişim grubu</strong>, <strong>Atwater otomatik makro motoru</strong>,
-                  <strong>HOMA-IR & kan tahlili analizi</strong>, <strong>İlaç–Besin etkileşim denetimi</strong>,
-                  <strong>GLP-1 sarkopeni radarı</strong> ve <strong>görsel randevu ajandası</strong>
-                  tek klinik yazılımda birleşti.
-                </p>
-
-                <!-- Ekran Üzeri Doğrudan Giriş Yap / Kayıt Ol / Portal / Demo Kartları -->
-                <div
-                  class="mt-7 grid gap-3 sm:grid-cols-2"
-                  aria-label="Hızlı giriş ve kayıt seçenekleri"
-                >
-                  <a
-                    routerLink="/register"
-                    class="group flex items-center justify-between rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 p-4 text-white shadow-xl shadow-violet-600/25 transition hover:from-violet-500 hover:to-indigo-500"
-                  >
-                    <div>
-                      <span
-                        class="inline-block rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider"
-                      >
-                        {{ trialDays }} Gün Ücretsiz Deneme
-                      </span>
-                      <strong class="mt-1 block text-base font-extrabold"
-                        >Yeni Uzman Kaydı Oluştur</strong
-                      >
-                      <span class="text-xs text-violet-100"
-                        >Kredi kartı gerekmez · 1 dakikada kliniğinizi açın</span
-                      >
-                    </div>
-                    <span
-                      class="material-symbols-rounded !text-2xl transition-transform group-hover:translate-x-1"
-                      aria-hidden="true"
-                      >arrow_forward</span
+                    <span class="material-symbols-rounded !text-sm text-emerald-500" aria-hidden="true"
+                      >lock</span
                     >
-                  </a>
-
-                  <a
-                    routerLink="/login"
-                    class="group flex items-center justify-between rounded-2xl border-2 border-slate-200 bg-white p-4 transition hover:border-violet-400 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-violet-500"
-                  >
-                    <div>
-                      <span
-                        class="inline-block rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-violet-700 dark:bg-violet-950 dark:text-violet-300"
-                      >
-                        Klinik Yönetim Paneli
-                      </span>
-                      <strong class="mt-1 block text-base font-extrabold"
-                        >Diyetisyen Girişi Yap</strong
-                      >
-                      <span class="text-xs text-slate-500 dark:text-slate-400"
-                        >Mevcut uzman hesabınızla oturum açın</span
-                      >
-                    </div>
-                    <span
-                      class="material-symbols-rounded !text-2xl text-violet-600 transition-transform group-hover:translate-x-1"
-                      aria-hidden="true"
-                      >login</span
-                    >
-                  </a>
-
+                    {{ currentScreenMeta().routeUrl }}
+                  </div>
                   <button
                     type="button"
                     (click)="launchDietitianDemo()"
-                    class="flex items-center justify-between rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 text-start transition hover:border-violet-400 dark:border-slate-800 dark:bg-slate-900/80"
+                    class="text-[11px] font-bold text-violet-600 hover:underline dark:text-violet-400"
                   >
-                    <div class="flex items-center gap-3">
-                      <span
-                        class="grid size-9 place-items-center rounded-xl bg-violet-50 text-violet-600 dark:bg-violet-950/60 dark:text-violet-300"
-                      >
-                        <span class="material-symbols-rounded !text-xl" aria-hidden="true"
-                          >science</span
-                        >
-                      </span>
-                      <div>
-                        <strong class="block text-xs font-extrabold"
-                          >Canlı Diyetisyen Demosunu İncele</strong
-                        >
-                        <span class="text-[11px] text-slate-500"
-                          >Kayıt olmadan örnek danışan ve menülerle test edin</span
-                        >
-                      </div>
-                    </div>
-                    <span class="material-symbols-rounded !text-lg text-slate-400" aria-hidden="true"
-                      >open_in_new</span
-                    >
+                    Bu Ekranı Canlı Aç →
                   </button>
+                </div>
 
-                  <div class="flex gap-2">
-                    <a
-                      routerLink="/portal/login"
-                      class="flex flex-1 items-center justify-between rounded-2xl border border-emerald-200 bg-emerald-50/60 px-4 py-3 transition hover:border-emerald-400 dark:border-emerald-900/50 dark:bg-emerald-950/30"
-                    >
-                      <div class="flex items-center gap-2.5">
+                <!-- Uygulama İçi Görsel Ekran Görüntüsü (Sol Sidebar + Sağ İçerik Alanı) -->
+                <div class="grid min-h-[470px] lg:grid-cols-[220px_1fr]">
+                  <!-- Sol Uygulama Menüsü Mockup -->
+                  <aside
+                    class="hidden border-e border-slate-200/80 bg-slate-50/70 p-4 lg:flex lg:flex-col lg:justify-between dark:border-slate-800 dark:bg-slate-900/50"
+                    aria-hidden="true"
+                  >
+                    <div class="space-y-4">
+                      <div class="flex items-center gap-2.5 px-2">
                         <span
-                          class="grid size-9 place-items-center rounded-xl bg-emerald-500 text-white"
+                          class="grid size-8 place-items-center rounded-lg bg-violet-600 text-white"
                         >
-                          <span class="material-symbols-rounded !text-lg" aria-hidden="true"
-                            >favorite</span
-                          >
+                          <span class="material-symbols-rounded !text-base">nutrition</span>
                         </span>
                         <div>
-                          <strong class="block text-xs font-extrabold text-emerald-950 dark:text-white"
-                            >Danışan Portalı Girişi</strong
+                          <strong class="block text-xs font-extrabold">OdivonDiet</strong>
+                          <span class="text-[10px] text-slate-400">Uzm. Dyt. Deniz Arslan</span>
+                        </div>
+                      </div>
+                      <div class="space-y-1 text-xs">
+                        @for (nav of screenTabs; track nav.id) {
+                          <div
+                            class="flex items-center gap-2 rounded-xl px-3 py-2 font-semibold"
+                            [class]="
+                              activeScreen() === nav.id
+                                ? 'bg-violet-600 text-white'
+                                : 'text-slate-500 dark:text-slate-400'
+                            "
                           >
-                          <span class="text-[11px] text-emerald-700 dark:text-emerald-300"
-                            >Menü & ölçüm ekranı</span
+                            <span class="material-symbols-rounded !text-base">{{ nav.icon }}</span>
+                            <span class="truncate">{{ nav.label.slice(3) }}</span>
+                          </div>
+                        }
+                      </div>
+                    </div>
+                    <div class="rounded-xl border border-slate-200 bg-white p-3 text-[11px] dark:border-slate-800 dark:bg-slate-900">
+                      <strong class="block text-violet-600 dark:text-violet-400"
+                        >Aktif Klinik</strong
+                      >
+                      <span class="text-slate-500">Nişantaşı Beslenme Merkezi</span>
+                    </div>
+                  </aside>
+
+                  <!-- Sağ Ekran İçeriği -->
+                  <div class="p-5 sm:p-7">
+                    <!-- EKRAN 1: GENEL BAKIŞ & KLİNİK KOKPİT -->
+                    @if (activeScreen() === 'overview') {
+                      <div class="space-y-5">
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <span class="odv-eyebrow">Genel Bakış · Klinik Kokpit</span>
+                            <h3 class="text-lg font-extrabold">
+                              Günaydın, Uzm. Dyt. Deniz Arslan
+                            </h3>
+                          </div>
+                          <span class="odv-badge odv-tone-positive"
+                            >Bugün 3 Randevu · %94 Plan Uyumu</span
+                          >
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                          <div class="rounded-2xl border border-slate-200 p-3.5 dark:border-slate-800">
+                            <span class="text-[11px] text-slate-400">Aktif Danışan</span>
+                            <strong class="tabular mt-1 block text-2xl font-extrabold">48</strong>
+                            <span class="text-[11px] font-semibold text-emerald-600"
+                              >+6 bu ay yeni kayıt</span
+                            >
+                          </div>
+                          <div class="rounded-2xl border border-slate-200 p-3.5 dark:border-slate-800">
+                            <span class="text-[11px] text-slate-400">Toplam Yağ Kaybı</span>
+                            <strong class="tabular mt-1 block text-2xl font-extrabold text-emerald-600"
+                              >−184,6 kg</strong
+                            >
+                            <span class="text-[11px] text-slate-400">Kas korunumu %91</span>
+                          </div>
+                          <div class="rounded-2xl border border-slate-200 p-3.5 dark:border-slate-800">
+                            <span class="text-[11px] text-slate-400">Aktif Diyet Planı</span>
+                            <strong class="tabular mt-1 block text-2xl font-extrabold text-violet-600"
+                              >44</strong
+                            >
+                            <span class="text-[11px] text-slate-400">Ort. 1.720 kcal/gün</span>
+                          </div>
+                          <div class="rounded-2xl border border-slate-200 p-3.5 dark:border-slate-800">
+                            <span class="text-[11px] text-slate-400">Klinik Uyarı</span>
+                            <strong class="tabular mt-1 block text-2xl font-extrabold text-amber-600"
+                              >3</strong
+                            >
+                            <span class="text-[11px] text-slate-400">Ölçüm & tahlil kontrolü</span>
+                          </div>
+                        </div>
+
+                        <div class="grid gap-4 lg:grid-cols-[1.35fr_1fr]">
+                          <div class="rounded-2xl border border-slate-200 p-4 dark:border-slate-800">
+                            <div class="flex items-center justify-between">
+                              <strong class="text-xs font-extrabold"
+                                >Elif Kaya — Kilo & İskelet Kası (SMM) İlerleme Grafiği</strong
+                              >
+                              <span class="odv-badge odv-tone-positive">82,0 kg → 74,6 kg</span>
+                            </div>
+                            <svg
+                              viewBox="0 0 360 110"
+                              class="mt-3 h-28 w-full"
+                              preserveAspectRatio="none"
+                              aria-hidden="true"
+                            >
+                              <defs>
+                                <linearGradient id="scr-grad" x1="0" x2="0" y1="0" y2="1">
+                                  <stop offset="0%" stop-color="#7c3aed" stop-opacity=".35" />
+                                  <stop offset="100%" stop-color="#7c3aed" stop-opacity="0" />
+                                </linearGradient>
+                              </defs>
+                              <path
+                                d="M0,18 C60,25 110,38 170,52 S280,74 360,86 L360,110 L0,110 Z"
+                                fill="url(#scr-grad)"
+                              />
+                              <path
+                                d="M0,18 C60,25 110,38 170,52 S280,74 360,86"
+                                fill="none"
+                                stroke="#7c3aed"
+                                stroke-width="3"
+                                stroke-linecap="round"
+                              />
+                              <line
+                                x1="0"
+                                x2="360"
+                                y1="95"
+                                y2="95"
+                                stroke="#10b981"
+                                stroke-dasharray="5 5"
+                              />
+                            </svg>
+                            <div class="mt-2 flex justify-between text-[11px] text-slate-400">
+                              <span>1. Hafta (82,0 kg)</span>
+                              <span>4. Hafta (79,4 kg)</span>
+                              <span>8. Hafta (76,8 kg)</span>
+                              <span class="font-bold text-emerald-600">12. Hafta (74,6 kg)</span>
+                            </div>
+                          </div>
+
+                          <div class="rounded-2xl border border-slate-200 p-4 dark:border-slate-800">
+                            <strong class="block text-xs font-extrabold"
+                              >Bugünkü Klinik Görüşmeler</strong
+                            >
+                            <div class="mt-3 space-y-2 text-xs">
+                              <div
+                                class="flex items-center justify-between rounded-xl bg-slate-50 p-2.5 dark:bg-slate-800/60"
+                              >
+                                <div>
+                                  <strong class="block">09:30 · Elif Kaya</strong>
+                                  <span class="text-[11px] text-slate-500"
+                                    >Yüz yüze · InBody BIA + Faz 2</span
+                                  >
+                                </div>
+                                <span class="odv-badge odv-tone-primary">Muayenehane</span>
+                              </div>
+                              <div
+                                class="flex items-center justify-between rounded-xl bg-slate-50 p-2.5 dark:bg-slate-800/60"
+                              >
+                                <div>
+                                  <strong class="block">11:00 · Mert Yılmaz</strong>
+                                  <span class="text-[11px] text-slate-500"
+                                    >Online Video · Yarı Maraton Planı</span
+                                  >
+                                </div>
+                                <span class="odv-badge odv-tone-info">Video</span>
+                              </div>
+                              <div
+                                class="flex items-center justify-between rounded-xl bg-slate-50 p-2.5 dark:bg-slate-800/60"
+                              >
+                                <div>
+                                  <strong class="block">15:30 · Zeynep Şahin</strong>
+                                  <span class="text-[11px] text-slate-500"
+                                    >Yüz yüze · Glutensiz Eliminasyon</span
+                                  >
+                                </div>
+                                <span class="odv-badge odv-tone-positive">İlk Muayene</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    }
+
+                    <!-- EKRAN 2: DİYET PROGRAMI & OTOMATİK KALORİ STÜDYOSU -->
+                    @if (activeScreen() === 'plans') {
+                      <div class="space-y-4">
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <span class="odv-eyebrow">Menü Mühendisliği & Atwater Motoru</span>
+                            <h3 class="text-lg font-extrabold">
+                              Elif Kaya — İnsülin Direnci Faz 2 Diyet Programı
+                            </h3>
+                          </div>
+                          <div class="flex flex-wrap gap-1.5 text-xs">
+                            <span class="odv-badge odv-tone-primary">Hedef: 1650 kcal</span>
+                            <span class="odv-badge odv-tone-positive"
+                              >Hesaplanan Menü: 1642 kcal</span
+                            >
+                            <span class="odv-badge odv-tone-info"
+                              >Protein: 118 g (1,6 g/kg) · Lif: 34,2 g</span
+                            >
+                          </div>
+                        </div>
+
+                        <div class="grid gap-3 md:grid-cols-3">
+                          <div class="rounded-2xl border border-slate-200 p-3.5 dark:border-slate-800">
+                            <div class="flex justify-between border-b border-slate-100 pb-2 text-xs font-bold dark:border-slate-800">
+                              <span class="text-violet-600">08:00 · Kahvaltı</span>
+                              <span class="tabular">412 kcal</span>
+                            </div>
+                            <ul class="mt-2.5 space-y-1.5 text-xs">
+                              <li class="flex justify-between">
+                                <span>2 adet haşlanmış yumurta (100g)</span>
+                                <b class="tabular">144 kcal</b>
+                              </li>
+                              <li class="flex justify-between">
+                                <span>1 dilim Ezine peyniri (veya Lor)</span>
+                                <b class="tabular">93 kcal</b>
+                              </li>
+                              <li class="flex justify-between">
+                                <span>2 dilim karabuğday ekmeği (60g)</span>
+                                <b class="tabular">130 kcal</b>
+                              </li>
+                              <li class="flex justify-between">
+                                <span>5 adet zeytin + yeşillik</span>
+                                <b class="tabular">45 kcal</b>
+                              </li>
+                            </ul>
+                          </div>
+
+                          <div class="rounded-2xl border border-slate-200 p-3.5 dark:border-slate-800">
+                            <div class="flex justify-between border-b border-slate-100 pb-2 text-xs font-bold dark:border-slate-800">
+                              <span class="text-violet-600">13:00 · Öğle Yemeği</span>
+                              <span class="tabular">565 kcal</span>
+                            </div>
+                            <ul class="mt-2.5 space-y-1.5 text-xs">
+                              <li class="flex justify-between">
+                                <span>1 kepçe mercimek çorbası (200ml)</span>
+                                <b class="tabular">135 kcal</b>
+                              </li>
+                              <li class="flex justify-between">
+                                <span>150g ızgara tavuk göğsü</span>
+                                <b class="tabular">248 kcal</b>
+                              </li>
+                              <li class="flex justify-between">
+                                <span>4 YK siyez bulgur pilavı (100g)</span>
+                                <b class="tabular">132 kcal</b>
+                              </li>
+                              <li class="flex justify-between">
+                                <span>Mevsim salata (1 TK zeytinyağlı)</span>
+                                <b class="tabular">50 kcal</b>
+                              </li>
+                            </ul>
+                          </div>
+
+                          <div class="rounded-2xl border border-slate-200 p-3.5 dark:border-slate-800">
+                            <div class="flex justify-between border-b border-slate-100 pb-2 text-xs font-bold dark:border-slate-800">
+                              <span class="text-violet-600">19:00 · Akşam Yemeği</span>
+                              <span class="tabular">485 kcal</span>
+                            </div>
+                            <ul class="mt-2.5 space-y-1.5 text-xs">
+                              <li class="flex justify-between">
+                                <span>180g fırında somon (Omega-3)</span>
+                                <b class="tabular">295 kcal</b>
+                              </li>
+                              <li class="flex justify-between">
+                                <span>1 porsiyon zeytinyağlı enginar</span>
+                                <b class="tabular">110 kcal</b>
+                              </li>
+                              <li class="flex justify-between">
+                                <span>1 su bardağı probiyotik kefir</span>
+                                <b class="tabular">80 kcal</b>
+                              </li>
+                            </ul>
+                          </div>
+                        </div>
+
+                        <div
+                          class="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-violet-50/80 p-3.5 text-xs dark:bg-violet-950/30"
+                        >
+                          <div>
+                            <strong class="text-violet-900 dark:text-violet-200"
+                              >BeBis Günlük Değişim Dağılımı:</strong
+                            >
+                            <span class="ms-2 text-slate-600 dark:text-slate-300"
+                              >Süt: 2,5 · Et/Peynir: 5,0 · Ekmek/Tahıl: 4,0 · Sebze: 3,0 · Meyve:
+                              2,0 · Yağ: 3,5</span
+                            >
+                          </div>
+                          <span class="odv-badge odv-tone-primary"
+                            >🛒 7 Günlük Market Listesi Hazır</span
                           >
                         </div>
                       </div>
-                    </a>
-                    <button
-                      type="button"
-                      (click)="launchMemberDemo()"
-                      class="rounded-2xl border border-emerald-200 bg-white px-3 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-50 dark:border-emerald-900/50 dark:bg-slate-900 dark:text-emerald-300"
-                      title="Örnek danışan olarak portalı aç"
-                    >
-                      Demo Portal
-                    </button>
+                    }
+
+                    <!-- EKRAN 3: KAN TAHLİLİ, HOMA-IR, İLAÇ-BESİN & GLP-1 SARKOPENİ -->
+                    @if (activeScreen() === 'clinical') {
+                      <div class="space-y-4">
+                        <div class="grid gap-3 sm:grid-cols-3">
+                          <div
+                            class="rounded-2xl border border-rose-200 bg-rose-50/60 p-3.5 dark:border-rose-900/50 dark:bg-rose-950/30"
+                          >
+                            <span class="text-[10px] font-bold uppercase text-rose-600"
+                              >HOMA-IR İnsülin Direnci</span
+                            >
+                            <strong class="tabular mt-0.5 block text-2xl font-extrabold"
+                              >2,86</strong
+                            >
+                            <span class="text-[11px] text-slate-500"
+                              >Glukoz: 98 · İnsülin: 11,8 µIU/mL</span
+                            >
+                          </div>
+                          <div
+                            class="rounded-2xl border border-amber-200 bg-amber-50/60 p-3.5 dark:border-amber-900/50 dark:bg-amber-950/30"
+                          >
+                            <span class="text-[10px] font-bold uppercase text-amber-600"
+                              >TG / HDL Aterojenik İndeks</span
+                            >
+                            <strong class="tabular mt-0.5 block text-2xl font-extrabold"
+                              >2,65</strong
+                            >
+                            <span class="text-[11px] text-slate-500"
+                              >Trigliserid: 138 · HDL: 52 mg/dL</span
+                            >
+                          </div>
+                          <div
+                            class="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-3.5 dark:border-emerald-900/50 dark:bg-emerald-950/30"
+                          >
+                            <span class="text-[10px] font-bold uppercase text-emerald-600"
+                              >GLP-1 Sarkopeni Kas Radarı</span
+                            >
+                            <strong class="tabular mt-0.5 block text-2xl font-extrabold"
+                              >%9 Kas Kaybı</strong
+                            >
+                            <span class="text-[11px] text-slate-500"
+                              >Güvenli Sınır (&lt;%20) · 1,6 g/kg Protein</span
+                            >
+                          </div>
+                        </div>
+
+                        <div
+                          class="rounded-2xl border border-amber-300/80 bg-amber-50/50 p-4 text-xs dark:border-amber-900/50 dark:bg-amber-950/20"
+                        >
+                          <strong class="flex items-center gap-1.5 text-sm font-extrabold text-amber-900 dark:text-amber-200">
+                            <span class="material-symbols-rounded !text-lg text-amber-600"
+                              >medication</span
+                            >
+                            İlaç × Beslenme Planı × Kan Tahlili Otomatik Çapraz Uyarıları
+                          </strong>
+                          <div class="mt-2.5 grid gap-2.5 md:grid-cols-2">
+                            <div class="rounded-xl bg-white p-3 dark:bg-slate-900">
+                              <strong class="text-rose-600"
+                                >Euthyrox 50 mcg (Levotiroksin) × Kahvaltı Menüsü</strong
+                              >
+                              <p class="mt-1 text-slate-600 dark:text-slate-300">
+                                Kahvaltıdaki Ezine peyniri ve ceviz L-tiroksin emilimini %40
+                                düşürür. İlacı kahvaltıdan 45–60 dk önce aç karnına ayırın.
+                              </p>
+                            </div>
+                            <div class="rounded-xl bg-white p-3 dark:bg-slate-900">
+                              <strong class="text-violet-600"
+                                >Glifor 1000 mg (Metformin) × Serum B12 (310 pg/mL)</strong
+                              >
+                              <p class="mt-1 text-slate-600 dark:text-slate-300">
+                                Metformin kaynaklı ileal B12 malabsorpsiyonu saptandı. Sabah aç
+                                karnına 1000 mcg sublingual Metilkobalamin protokolü eklendi.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    }
+
+                    <!-- EKRAN 4: GÖRSEL RANDEVU TAKVİMİ & INBODY BIA -->
+                    @if (activeScreen() === 'calendar') {
+                      <div class="space-y-4">
+                        <div class="grid gap-3 sm:grid-cols-4">
+                          <div class="rounded-xl bg-slate-50 p-3 dark:bg-slate-800/60">
+                            <span class="text-[11px] text-slate-400">İskelet Kası (SMM)</span>
+                            <strong class="tabular block text-lg font-extrabold text-violet-600"
+                              >29,4 kg</strong
+                            >
+                          </div>
+                          <div class="rounded-xl bg-slate-50 p-3 dark:bg-slate-800/60">
+                            <span class="text-[11px] text-slate-400">Visseral Yağ</span>
+                            <strong class="tabular block text-lg font-extrabold"
+                              >Seviye 7 (Normal)</strong
+                            >
+                          </div>
+                          <div class="rounded-xl bg-slate-50 p-3 dark:bg-slate-800/60">
+                            <span class="text-[11px] text-slate-400">ECW/TBW (Ödem)</span>
+                            <strong class="tabular block text-lg font-extrabold text-emerald-600"
+                              >0,378</strong
+                            >
+                          </div>
+                          <div class="rounded-xl bg-slate-50 p-3 dark:bg-slate-800/60">
+                            <span class="text-[11px] text-slate-400">Biyoelektrik Faz Açısı</span>
+                            <strong class="tabular block text-lg font-extrabold">6,2°</strong>
+                          </div>
+                        </div>
+
+                        <div class="rounded-2xl border border-slate-200 p-4 dark:border-slate-800">
+                          <div class="mb-3 flex items-center justify-between text-xs">
+                            <strong class="font-extrabold"
+                              >Haftalık Görsel Randevu Takvimi (08:00–20:00 Saat Izgarası)</strong
+                            >
+                            <span class="text-slate-400"
+                              >Boş slota tıklayarak anında randevu oluşturun</span
+                            >
+                          </div>
+                          <div class="grid grid-cols-5 gap-2 text-xs">
+                            <div class="rounded-xl border border-slate-200 p-2.5 dark:border-slate-800">
+                              <span class="block text-[10px] font-bold text-slate-400"
+                                >Pazartesi</span
+                              >
+                              <div class="mt-2 rounded-lg bg-violet-100 p-2 text-violet-900 dark:bg-violet-950/80 dark:text-violet-200">
+                                <b>09:30</b> Elif Kaya
+                                <span class="block text-[10px]">Yüz yüze BIA</span>
+                              </div>
+                            </div>
+                            <div class="rounded-xl border border-slate-200 p-2.5 dark:border-slate-800">
+                              <span class="block text-[10px] font-bold text-slate-400">Salı</span>
+                              <div class="mt-2 rounded-lg bg-sky-100 p-2 text-sky-900 dark:bg-sky-950/80 dark:text-sky-200">
+                                <b>11:00</b> Mert Yılmaz
+                                <span class="block text-[10px]">Online Video</span>
+                              </div>
+                            </div>
+                            <div class="rounded-xl border border-slate-200 p-2.5 dark:border-slate-800">
+                              <span class="block text-[10px] font-bold text-slate-400"
+                                >Çarşamba</span
+                              >
+                              <div class="mt-2 rounded-lg bg-emerald-100 p-2 text-emerald-900 dark:bg-emerald-950/80 dark:text-emerald-200">
+                                <b>14:00</b> Selin Aras
+                                <span class="block text-[10px]">Kontrol Muayene</span>
+                              </div>
+                            </div>
+                            <div class="rounded-xl border border-slate-200 p-2.5 dark:border-slate-800">
+                              <span class="block text-[10px] font-bold text-slate-400"
+                                >Perşembe</span
+                              >
+                              <div class="mt-2 rounded-lg bg-amber-100 p-2 text-amber-900 dark:bg-amber-950/80 dark:text-amber-200">
+                                <b>16:00</b> Burak Demir
+                                <span class="block text-[10px]">GLP-1 Titrasyon</span>
+                              </div>
+                            </div>
+                            <div class="rounded-xl border border-slate-200 p-2.5 dark:border-slate-800">
+                              <span class="block text-[10px] font-bold text-slate-400">Cuma</span>
+                              <div class="mt-2 rounded-lg bg-violet-100 p-2 text-violet-900 dark:bg-violet-950/80 dark:text-violet-200">
+                                <b>15:30</b> Zeynep Şahin
+                                <span class="block text-[10px]">Eliminasyon Planı</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    }
+
+                    <!-- EKRAN 5: DANIŞAN MOBİL & WEB PORTALI -->
+                    @if (activeScreen() === 'portal') {
+                      <div class="grid items-center gap-6 md:grid-cols-[1fr_1.2fr]">
+                        <div class="space-y-3">
+                          <span class="odv-badge odv-tone-positive">Danışan Deneyimi</span>
+                          <h3 class="text-lg font-extrabold">
+                            Danışanlarınız kendi portalından programını adım adım uygular
+                          </h3>
+                          <p class="text-xs leading-5 text-slate-500 dark:text-slate-400">
+                            Danışanınıza gönderdiğiniz davet ile kendi ekranından günlük öğünlerini,
+                            alternatif yemeklerini, su hedefini, haftalık ölçüm girişlerini ve
+                            mesajlarınızı anlık takip eder.
+                          </p>
+                          <div class="flex flex-wrap gap-2 pt-1">
+                            <button
+                              type="button"
+                              (click)="launchMemberDemo()"
+                              class="odv-btn-primary !min-h-9 text-xs"
+                            >
+                              Canlı Danışan Portalını Aç →
+                            </button>
+                            <a routerLink="/portal/login" class="odv-btn-soft !min-h-9 text-xs">
+                              Danışan Giriş Ekranı
+                            </a>
+                          </div>
+                        </div>
+
+                        <div
+                          class="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-4 text-xs dark:border-emerald-900/50 dark:bg-emerald-950/20"
+                        >
+                          <div class="flex items-center justify-between border-b border-emerald-200/60 pb-2.5 dark:border-emerald-900/40">
+                            <div>
+                              <strong class="block text-sm">Merhaba, Elif Kaya 👋</strong>
+                              <span class="text-[11px] text-slate-500"
+                                >Aktif Program: Kilo Verme · Faz 2 (1.650 kcal)</span
+                              >
+                            </div>
+                            <span class="odv-badge odv-tone-positive">Hedefe %61</span>
+                          </div>
+                          <div class="mt-3 grid grid-cols-3 gap-2 text-center">
+                            <div class="rounded-xl bg-white p-2.5 dark:bg-slate-900">
+                              <span class="text-[10px] text-slate-400">Güncel Kilo</span>
+                              <strong class="tabular block text-sm font-extrabold">74,6 kg</strong>
+                            </div>
+                            <div class="rounded-xl bg-white p-2.5 dark:bg-slate-900">
+                              <span class="text-[10px] text-slate-400">Günlük Su</span>
+                              <strong class="tabular block text-sm font-extrabold text-sky-600"
+                                >2,8 L</strong
+                              >
+                            </div>
+                            <div class="rounded-xl bg-white p-2.5 dark:bg-slate-900">
+                              <span class="text-[10px] text-slate-400">Sonraki Randevu</span>
+                              <strong class="block text-sm font-extrabold text-violet-600"
+                                >09:30</strong
+                              >
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    }
                   </div>
                 </div>
 
-                <!-- Güven Rozetleri -->
-                <div class="mt-7 grid grid-cols-3 gap-3 border-t border-slate-200/80 pt-6 dark:border-slate-800">
-                  <div>
-                    <strong class="tabular block text-2xl font-extrabold text-violet-600"
-                      >4 Formül</strong
+                <!-- Alt Ekran Açıklama Bandı -->
+                <div
+                  class="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 bg-slate-50 px-5 py-3 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-300"
+                >
+                  <span>{{ currentScreenMeta().caption }}</span>
+                  <div class="flex items-center gap-3 font-bold">
+                    <a routerLink="/register" class="text-violet-600 hover:underline dark:text-violet-400"
+                      >Kayıt Ol & Kullanmaya Başla</a
                     >
-                    <span class="text-xs text-slate-500"
-                      >Mifflin, Harris, Katch-McArdle & Cunningham</span
-                    >
-                  </div>
-                  <div>
-                    <strong class="tabular block text-2xl font-extrabold text-emerald-600"
-                      >BeBis & Atwater</strong
-                    >
-                    <span class="text-xs text-slate-500"
-                      >Otomatik kalori, lif, g/kg ve değişim hesabı</span
-                    >
-                  </div>
-                  <div>
-                    <strong class="tabular block text-2xl font-extrabold text-sky-600"
-                      >%100 KVKK</strong
-                    >
-                    <span class="text-xs text-slate-500"
-                      >Açık rıza onayı & izole klinik çalışma alanı</span
-                    >
+                    <span>·</span>
+                    <a routerLink="/login" class="hover:underline">Giriş Yap</a>
                   </div>
                 </div>
-              </div>
-
-              <!-- Sağ: Etkileşimli Canlı Klinik Kokpit Vitrini -->
-              <div
-                id="vitrin"
-                class="rounded-3xl border border-slate-200/90 bg-[#0c0820] p-5 text-white shadow-2xl shadow-violet-950/30 dark:border-slate-800"
-              >
-                <div class="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-3.5">
-                  <div class="flex items-center gap-2">
-                    <span class="size-2.5 rounded-full bg-rose-400"></span>
-                    <span class="size-2.5 rounded-full bg-amber-400"></span>
-                    <span class="size-2.5 rounded-full bg-emerald-400"></span>
-                    <span class="ms-2 text-xs font-bold text-slate-300"
-                      >OdivonDiet Klinik Kokpit Önizlemesi</span
-                    >
-                  </div>
-                  <div class="flex flex-wrap gap-1" role="tablist" aria-label="Kokpit önizleme sekmeleri">
-                    <button
-                      type="button"
-                      role="tab"
-                      [attr.aria-selected]="showcaseTab() === 'studio'"
-                      class="rounded-lg px-2.5 py-1 text-[11px] font-bold transition"
-                      [class]="
-                        showcaseTab() === 'studio'
-                          ? 'bg-violet-600 text-white'
-                          : 'bg-white/5 text-slate-300 hover:bg-white/10'
-                      "
-                      (click)="showcaseTab.set('studio')"
-                    >
-                      Menü & Kalori
-                    </button>
-                    <button
-                      type="button"
-                      role="tab"
-                      [attr.aria-selected]="showcaseTab() === 'biomarker'"
-                      class="rounded-lg px-2.5 py-1 text-[11px] font-bold transition"
-                      [class]="
-                        showcaseTab() === 'biomarker'
-                          ? 'bg-violet-600 text-white'
-                          : 'bg-white/5 text-slate-300 hover:bg-white/10'
-                      "
-                      (click)="showcaseTab.set('biomarker')"
-                    >
-                      HOMA-IR & İlaç-Besin
-                    </button>
-                    <button
-                      type="button"
-                      role="tab"
-                      [attr.aria-selected]="showcaseTab() === 'glp1'"
-                      class="rounded-lg px-2.5 py-1 text-[11px] font-bold transition"
-                      [class]="
-                        showcaseTab() === 'glp1'
-                          ? 'bg-violet-600 text-white'
-                          : 'bg-white/5 text-slate-300 hover:bg-white/10'
-                      "
-                      (click)="showcaseTab.set('glp1')"
-                    >
-                      GLP-1 & BIA
-                    </button>
-                    <button
-                      type="button"
-                      role="tab"
-                      [attr.aria-selected]="showcaseTab() === 'calendar'"
-                      class="rounded-lg px-2.5 py-1 text-[11px] font-bold transition"
-                      [class]="
-                        showcaseTab() === 'calendar'
-                          ? 'bg-violet-600 text-white'
-                          : 'bg-white/5 text-slate-300 hover:bg-white/10'
-                      "
-                      (click)="showcaseTab.set('calendar')"
-                    >
-                      Görsel Takvim
-                    </button>
-                  </div>
-                </div>
-
-                @if (showcaseTab() === 'studio') {
-                  <div class="mt-4 space-y-3">
-                    <div class="flex items-center justify-between rounded-2xl bg-white/[.06] p-3.5">
-                      <div>
-                        <span class="text-[11px] font-semibold text-violet-300"
-                          >Danışan: Elif Kaya · İnsülin Direnci Faz 2</span
-                        >
-                        <strong class="block text-sm"
-                          >Mifflin BMR: 1468 kcal · TDEE: 2019 kcal → Hedef: 1650 kcal</strong
-                        >
-                      </div>
-                      <span
-                        class="rounded-full bg-emerald-400/20 px-2.5 py-1 text-xs font-bold text-emerald-300"
-                        >%100 Uyumlu</span
-                      >
-                    </div>
-
-                    <div class="grid grid-cols-4 gap-2 text-center text-xs">
-                      <div class="rounded-xl bg-white/[.05] p-2.5">
-                        <span class="text-[10px] text-slate-400">Menü Enerji</span>
-                        <strong class="tabular block text-base text-white">1642 kcal</strong>
-                      </div>
-                      <div class="rounded-xl bg-white/[.05] p-2.5">
-                        <span class="text-[10px] text-slate-400">Protein</span>
-                        <strong class="tabular block text-base text-violet-300"
-                          >118g (1,6 g/kg)</strong
-                        >
-                      </div>
-                      <div class="rounded-xl bg-white/[.05] p-2.5">
-                        <span class="text-[10px] text-slate-400">Diyet Lifi</span>
-                        <strong class="tabular block text-base text-emerald-300">34,2 g</strong>
-                      </div>
-                      <div class="rounded-xl bg-white/[.05] p-2.5">
-                        <span class="text-[10px] text-slate-400">Sirkadiyen Açlık</span>
-                        <strong class="tabular block text-base text-sky-300">13,5 saat</strong>
-                      </div>
-                    </div>
-
-                    <div class="space-y-2 rounded-2xl border border-white/10 bg-white/[.04] p-3.5 text-xs">
-                      <div class="flex items-center justify-between font-bold text-violet-200">
-                        <span>08:00 · Kahvaltı (Düşük Gİ)</span>
-                        <span class="tabular">412 kcal · P: 26g · Lif: 8.4g</span>
-                      </div>
-                      <ul class="space-y-1 text-slate-300">
-                        <li class="flex justify-between">
-                          <span>• 2 adet haşlanmış organik yumurta (Et değişimi)</span>
-                          <span class="tabular text-slate-400">144 kcal</span>
-                        </li>
-                        <li class="flex justify-between">
-                          <span>• 1 dilim Ezine peyniri (veya 2 YK lor peyniri)</span>
-                          <span class="tabular text-slate-400">93 kcal</span>
-                        </li>
-                        <li class="flex justify-between">
-                          <span>• 2 dilim ekşi mayalı karabuğday ekmeği</span>
-                          <span class="tabular text-slate-400">130 kcal</span>
-                        </li>
-                        <li class="flex justify-between">
-                          <span>• Yarım avokado + yeşillik (Yağ & Sebze değişimi)</span>
-                          <span class="tabular text-slate-400">45 kcal</span>
-                        </li>
-                      </ul>
-                    </div>
-
-                    <div
-                      class="flex items-center justify-between rounded-xl bg-violet-600/20 px-3.5 py-2.5 text-xs text-violet-200"
-                    >
-                      <span
-                        >🛒 <strong>7 Günlük Otomatik Alışveriş Listesi</strong> tek tıkla gramajlı
-                        hazır.</span
-                      >
-                      <button
-                        type="button"
-                        class="font-bold text-white underline"
-                        (click)="launchDietitianDemo()"
-                      >
-                        Stüdyoyu Canlı Dene →
-                      </button>
-                    </div>
-                  </div>
-                }
-
-                @if (showcaseTab() === 'biomarker') {
-                  <div class="mt-4 space-y-3 text-xs">
-                    <div class="grid grid-cols-2 gap-2.5">
-                      <div class="rounded-2xl border border-rose-500/30 bg-rose-500/10 p-3">
-                        <span class="text-[10px] font-bold uppercase text-rose-300"
-                          >HOMA-IR İnsülin Direnci</span
-                        >
-                        <strong class="tabular mt-0.5 block text-2xl font-extrabold text-white"
-                          >2,86</strong
-                        >
-                        <span class="text-[11px] text-rose-200"
-                          >Glukoz: 98 mg/dL · İnsülin: 11,8 µIU/mL</span
-                        >
-                      </div>
-                      <div class="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3">
-                        <span class="text-[10px] font-bold uppercase text-amber-300"
-                          >TG / HDL Aterojenik Oran</span
-                        >
-                        <strong class="tabular mt-0.5 block text-2xl font-extrabold text-white"
-                          >2,65</strong
-                        >
-                        <span class="text-[11px] text-amber-200"
-                          >TG: 138 mg/dL · HDL: 52 mg/dL</span
-                        >
-                      </div>
-                    </div>
-
-                    <div class="rounded-2xl border border-amber-400/30 bg-white/[.05] p-3.5">
-                      <strong class="flex items-center gap-1.5 text-amber-300">
-                        <span class="material-symbols-rounded !text-base">warning</span>
-                        İlaç × Besin × Tahlil Çapraz Uyarısı Yakalandı:
-                      </strong>
-                      <p class="mt-1 leading-5 text-slate-300">
-                        1. <b>Euthyrox 50 mcg (Levotiroksin):</b> Kahvaltıdaki peynir/ceviz ile
-                        kalsiyum şelasyonu riski! İlacı kahvaltıdan 45 dk önce aç karnına ayırın.
-                      </p>
-                      <p class="mt-1 leading-5 text-slate-300">
-                        2. <b>Glifor 1000 mg (Metformin) + B12 (310 pg/mL):</b> İleal B12 emilim
-                        baskılanması tespit edildi → Dil altı 1000 mcg Metilkobalamin eklendi.
-                      </p>
-                    </div>
-                  </div>
-                }
-
-                @if (showcaseTab() === 'glp1') {
-                  <div class="mt-4 space-y-3 text-xs">
-                    <div class="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 p-3.5">
-                      <div class="flex items-center justify-between">
-                        <span class="font-bold text-emerald-300"
-                          >GLP-1 (Ozempic 1.0 mg) & Sarkopeni Radarı</span
-                        >
-                        <span class="rounded-full bg-emerald-400/20 px-2 py-0.5 text-[10px] font-bold"
-                          >Kas Korunuyor</span
-                        >
-                      </div>
-                      <p class="mt-1.5 text-slate-200">
-                        Toplam Kayıp: <b>−7,4 kg</b> · İskelet Kası (SMM) Kaybı: <b>%9</b> (Güvenli
-                        sınır &lt;%20). Günlük 118 g protein ve 3 gün direnç antrenmanı aktif.
-                      </p>
-                    </div>
-
-                    <div class="grid grid-cols-3 gap-2 text-center">
-                      <div class="rounded-xl bg-white/[.06] p-2.5">
-                        <span class="text-[10px] text-slate-400">İskelet Kası (SMM)</span>
-                        <strong class="tabular block text-base text-white">29,4 kg</strong>
-                      </div>
-                      <div class="rounded-xl bg-white/[.06] p-2.5">
-                        <span class="text-[10px] text-slate-400">ECW/TBW (Ödem)</span>
-                        <strong class="tabular block text-base text-emerald-300">0,378</strong>
-                      </div>
-                      <div class="rounded-xl bg-white/[.06] p-2.5">
-                        <span class="text-[10px] text-slate-400">Faz Açısı</span>
-                        <strong class="tabular block text-base text-violet-300">6,2°</strong>
-                      </div>
-                    </div>
-                  </div>
-                }
-
-                @if (showcaseTab() === 'calendar') {
-                  <div class="mt-4 space-y-2.5 text-xs">
-                    <p class="text-slate-300">
-                      <strong>08:00–20:00 Görsel Randevu Takvimi:</strong> Boş slota tıklayarak yüz
-                      yüze muayenehane veya online video görüşmesi planlayın.
-                    </p>
-                    <div class="grid grid-cols-3 gap-2">
-                      <div class="rounded-xl border border-violet-400/30 bg-violet-500/15 p-2.5">
-                        <span class="font-bold text-violet-200">09:30 · Yüz Yüze</span>
-                        <strong class="mt-0.5 block text-white">Elif Kaya</strong>
-                        <span class="text-[10px] text-slate-300">InBody BIA + Faz 2 Kontrol</span>
-                      </div>
-                      <div class="rounded-xl border border-sky-400/30 bg-sky-500/15 p-2.5">
-                        <span class="font-bold text-sky-200">11:00 · Online Video</span>
-                        <strong class="mt-0.5 block text-white">Mert Yılmaz</strong>
-                        <span class="text-[10px] text-slate-300">Yarı Maraton Karbonhidrat Yükleme</span>
-                      </div>
-                      <div class="rounded-xl border border-emerald-400/30 bg-emerald-500/15 p-2.5">
-                        <span class="font-bold text-emerald-200">15:30 · İlk Muayene</span>
-                        <strong class="mt-0.5 block text-white">Zeynep Şahin</strong>
-                        <span class="text-[10px] text-slate-300">Eliminasyon & FODMAP Anamnezi</span>
-                      </div>
-                    </div>
-                  </div>
-                }
               </div>
             </div>
           </div>
@@ -984,7 +1234,7 @@ const MANAGEMENT_MODULES: readonly ModuleFeature[] = [
                       >Bu hesaplamayı tek tıkla öğün planına dönüştürmek ister misiniz?</span
                     >
                     <a routerLink="/register" class="odv-btn-primary !min-h-9 text-xs">
-                      Ücretsiz Hesap Aç & Planla →
+                      Kayıt Ol & Planla →
                     </a>
                   </div>
                 </div>
@@ -1075,7 +1325,7 @@ const MANAGEMENT_MODULES: readonly ModuleFeature[] = [
                         7 Günlük Otomatik Gramajlı Alışveriş & Meal-Prep Listesi
                       </td>
                       <td class="odv-td text-center text-rose-500">Yok</td>
-                      <td class="odv-td text-center text-slate-500">Ek Ücretli / Kısıtlı</td>
+                      <td class="odv-td text-center text-slate-500">Kısıtlı</td>
                       <td class="odv-td bg-violet-50/40 text-center font-extrabold text-emerald-600 dark:bg-violet-950/20">
                         ✓ 1 / 3 / 7 / 14 Günlük Tek Tıkla Hazır
                       </td>
@@ -1087,105 +1337,47 @@ const MANAGEMENT_MODULES: readonly ModuleFeature[] = [
           </div>
         </section>
 
-        <!-- PAKETLER & ŞEFFAF FİYATLANDIRMA -->
-        <section id="paketler" class="py-16 lg:py-24">
-          <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <div class="flex flex-col items-center justify-between gap-4 text-center sm:flex-row sm:text-start">
-              <div>
-                <span class="odv-eyebrow">Şeffaf & Esnek Abonelik</span>
-                <h2 class="mt-1 text-2xl font-extrabold tracking-tight sm:text-4xl">
-                  Muayenehanenizin büyüklüğüne göre ölçeklenen paketler
-                </h2>
-                <p class="mt-1 text-sm text-slate-500">
-                  İlk {{ trialDays }} gün boyunca Profesyonel paketin tüm klinik özelliklerini ücretsiz
-                  deneyin.
-                </p>
-              </div>
-
-              <div
-                class="inline-flex rounded-xl border border-slate-200 bg-white p-1 text-xs font-bold dark:border-slate-800 dark:bg-slate-900"
-                role="radiogroup"
-                aria-label="Fiyatlandırma dönemi"
-              >
-                <button
-                  type="button"
-                  role="radio"
-                  [attr.aria-checked]="cycle() === 'monthly'"
-                  class="rounded-lg px-3.5 py-2 transition"
-                  [class]="
-                    cycle() === 'monthly'
-                      ? 'bg-violet-600 text-white'
-                      : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                  "
-                  (click)="cycle.set('monthly')"
+        <!-- ALT BAŞLANGIÇ ÇAĞRISI (FİYAT VEYA SABİT PAKET OLMADAN) -->
+        <section class="py-16 lg:py-20">
+          <div class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
+            <div
+              class="rounded-3xl bg-gradient-to-r from-violet-600 via-indigo-600 to-violet-700 p-8 text-center text-white shadow-2xl shadow-violet-600/25 sm:p-12"
+            >
+              <h2 class="text-2xl font-extrabold tracking-tight sm:text-4xl">
+                Muayenehanenizi bugün dijital klinik standardına taşıyın
+              </h2>
+              <p class="mx-auto mt-3 max-w-2xl text-sm leading-6 text-violet-100">
+                Hemen uzman hesabınızı oluşturun, mevcut hesabınızla giriş yapın veya örnek klinik
+                verileriyle tüm modülleri canlı inceleyin.
+              </p>
+              <div class="mt-7 flex flex-wrap items-center justify-center gap-3">
+                <a
+                  routerLink="/register"
+                  class="inline-flex min-h-12 items-center gap-2 rounded-xl bg-white px-6 text-sm font-extrabold text-violet-700 shadow-lg transition hover:bg-violet-50"
                 >
-                  Aylık
-                </button>
-                <button
-                  type="button"
-                  role="radio"
-                  [attr.aria-checked]="cycle() === 'yearly'"
-                  class="rounded-lg px-3.5 py-2 transition"
-                  [class]="
-                    cycle() === 'yearly'
-                      ? 'bg-violet-600 text-white'
-                      : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                  "
-                  (click)="cycle.set('yearly')"
-                >
-                  Yıllık <span class="ms-1 text-[10px] opacity-90">(2 Ay Bedava)</span>
-                </button>
-              </div>
-            </div>
-
-            <div class="mt-10 grid gap-6 lg:grid-cols-3">
-              @for (plan of plans; track plan.id) {
-                <article
-                  class="odv-card relative flex flex-col p-6"
-                  [class.ring-2]="plan.highlight"
-                  [class.ring-violet-600]="plan.highlight"
-                >
-                  @if (plan.highlight) {
-                    <span
-                      class="absolute -top-3 start-6 rounded-full bg-violet-600 px-3 py-1 text-[11px] font-bold text-white shadow"
-                    >
-                      En Çok Tercih Edilen
-                    </span>
-                  }
-                  <h3 class="text-lg font-extrabold">{{ plan.name }}</h3>
-                  <p class="mt-1 text-xs text-slate-500">{{ plan.tagline }}</p>
-                  <div class="mt-4 flex items-baseline gap-1">
-                    <strong class="tabular text-3xl font-extrabold">{{ price(plan) }}</strong>
-                    <span class="text-xs text-slate-500">/ ay</span>
-                  </div>
-                  <p class="mt-1 text-[11px] text-slate-400">
-                    {{
-                      cycle() === 'yearly'
-                        ? 'Yıllık ' + yearly(plan) + ' olarak faturalanır'
-                        : 'KDV dahil, taahhütsüz aylık abonelik'
-                    }}
-                  </p>
-                  <ul class="mt-5 flex-1 space-y-2.5 text-xs">
-                    @for (feat of plan.features; track feat) {
-                      <li class="flex items-start gap-2">
-                        <span
-                          class="material-symbols-rounded !text-base text-emerald-500"
-                          aria-hidden="true"
-                          >check_circle</span
-                        >
-                        <span>{{ feat }}</span>
-                      </li>
-                    }
-                  </ul>
-                  <a
-                    routerLink="/register"
-                    class="mt-6 w-full justify-center"
-                    [class]="plan.highlight ? 'odv-btn-primary' : 'odv-btn-secondary'"
+                  <span class="material-symbols-rounded !text-lg" aria-hidden="true"
+                    >person_add</span
                   >
-                    {{ trialDays }} Gün Ücretsiz Başla
-                  </a>
-                </article>
-              }
+                  Ücretsiz Uzman Hesabı Oluştur
+                </a>
+                <a
+                  routerLink="/login"
+                  class="inline-flex min-h-12 items-center gap-2 rounded-xl border border-white/30 bg-white/10 px-6 text-sm font-bold text-white backdrop-blur transition hover:bg-white/20"
+                >
+                  <span class="material-symbols-rounded !text-lg" aria-hidden="true">login</span>
+                  Diyetisyen Girişi Yap
+                </a>
+                <button
+                  type="button"
+                  (click)="launchDietitianDemo()"
+                  class="inline-flex min-h-12 items-center gap-2 rounded-xl border border-white/30 bg-white/10 px-5 text-sm font-bold text-white backdrop-blur transition hover:bg-white/20"
+                >
+                  <span class="material-symbols-rounded !text-lg" aria-hidden="true"
+                    >play_circle</span
+                  >
+                  Canlı Demo İncele
+                </button>
+              </div>
             </div>
           </div>
         </section>
@@ -1224,11 +1416,13 @@ export class LandingPage {
   private readonly auth = inject(AuthStore);
   private readonly router = inject(Router);
 
+  readonly screenTabs = SCREEN_TABS;
+  readonly activeScreen = signal<ScreenId>('overview');
+  readonly currentScreenMeta = computed(
+    () => SCREEN_TABS.find((s) => s.id === this.activeScreen()) ?? SCREEN_TABS[0],
+  );
+
   readonly modules = MANAGEMENT_MODULES;
-  readonly plans = PLANS;
-  readonly trialDays = TRIAL_DAYS;
-  readonly cycle = signal<BillingCycle>('yearly');
-  readonly showcaseTab = signal<ShowcaseTab>('studio');
 
   // Interactive Calculator Signals
   readonly calcSex = signal<Sex>('female');
@@ -1277,14 +1471,6 @@ export class LandingPage {
     };
   });
 
-  price(plan: Plan): string {
-    return formatTry(this.cycle() === 'yearly' ? plan.yearlyMonthlyPrice : plan.monthlyPrice);
-  }
-
-  yearly(plan: Plan): string {
-    return formatTry(yearlyTotal(plan));
-  }
-
   async launchDietitianDemo(): Promise<void> {
     this.auth.continueDemo();
     await this.router.navigateByUrl('/overview');
@@ -1295,4 +1481,3 @@ export class LandingPage {
     await this.router.navigateByUrl('/portal');
   }
 }
-
