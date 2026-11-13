@@ -2,16 +2,19 @@ import { DatePipe, DecimalPipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { DietStore } from '../../core/data/diet-store';
+import { Notify } from '../../core/notify/notify';
 import {
   analyzeChronoNutrition,
   buildGroceryList,
   daysBetween,
+  isoDate,
   round1,
   summarizeMeals,
 } from '../../domain/diet-calc';
 import {
   EXCHANGE_GROUP_LABELS,
   ExchangeGroup,
+  MealFoodItem,
   MealPlan,
   PLAN_STATUS_LABELS,
   PlanStatus,
@@ -232,6 +235,78 @@ const STATUS_TONE: Record<PlanStatus, string> = {
                             </div>
                           </div>
 
+                          <!-- Hızlı Aksiyon Barı: WhatsApp Özeti, PDF Yazdır ve Başka Danışana Kopyala/Ölçekle -->
+                          <div
+                            class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
+                          >
+                            <div class="flex flex-wrap items-center gap-2">
+                              <button
+                                type="button"
+                                class="odv-btn-soft !min-h-8 !px-3 text-xs font-bold"
+                                (click)="copyWhatsAppSummary(plan)"
+                              >
+                                <span class="material-symbols-rounded !text-base" aria-hidden="true"
+                                  >share</span
+                                >
+                                WhatsApp Reçete Özeti Kopyala
+                              </button>
+                              <button
+                                type="button"
+                                class="odv-btn-ghost !min-h-8 !px-3 text-xs"
+                                (click)="printPlan()"
+                              >
+                                <span class="material-symbols-rounded !text-base" aria-hidden="true"
+                                  >print</span
+                                >
+                                Reçete PDF / Yazdır
+                              </button>
+                            </div>
+
+                            <div class="flex flex-wrap items-center gap-2">
+                              <label class="sr-only" [attr.for]="'clone-client-' + plan.id"
+                                >Hedef danışan seçin</label
+                              >
+                              <select
+                                [id]="'clone-client-' + plan.id"
+                                class="odv-input !w-auto !py-1.5 text-xs"
+                                [value]="cloneTargetClientId()"
+                                (change)="onCloneClientChange($any($event.target).value)"
+                              >
+                                <option value="">Başka danışana kopyala & ölçekle…</option>
+                                @for (c of store.activeClients(); track c.client.id) {
+                                  <option [value]="c.client.id">
+                                    {{ c.fullName }} (TDEE {{ c.tdee }} kcal)
+                                  </option>
+                                }
+                              </select>
+                              @if (cloneTargetClientId()) {
+                                <label class="sr-only" [attr.for]="'clone-kcal-' + plan.id"
+                                  >Hedef kalori</label
+                                >
+                                <input
+                                  [id]="'clone-kcal-' + plan.id"
+                                  type="number"
+                                  step="50"
+                                  min="1000"
+                                  max="4500"
+                                  class="odv-input !w-24 !py-1.5 text-xs tabular"
+                                  [value]="cloneTargetKcal()"
+                                  (input)="cloneTargetKcal.set(+$any($event.target).value || plan.kcal)"
+                                />
+                                <button
+                                  type="button"
+                                  class="odv-btn-primary !min-h-8 !px-3 text-xs"
+                                  (click)="cloneAndScalePlan(plan)"
+                                >
+                                  <span class="material-symbols-rounded !text-base" aria-hidden="true"
+                                    >content_copy</span
+                                  >
+                                  Gramajları Ölçekle & Kaydet
+                                </button>
+                              }
+                            </div>
+                          </div>
+
                           @if (exchangeBadges(plan).length) {
                             <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
                               <div class="flex flex-wrap items-center gap-1.5">
@@ -339,9 +414,9 @@ const STATUS_TONE: Record<PlanStatus, string> = {
                                           <span class="block text-[11px] text-slate-500">
                                             {{ item.portions }} × {{ item.unit }} ({{ item.grams }}
                                             g)
-                                            @if (item.alternative) {
-                                              <em class="text-violet-600">
-                                                · veya {{ item.alternative }}
+                                            @if (autoExchangeHint(item); as altText) {
+                                              <em class="text-violet-600 dark:text-violet-300">
+                                                · veya {{ altText }}
                                               </em>
                                             }
                                           </span>
@@ -392,6 +467,7 @@ const STATUS_TONE: Record<PlanStatus, string> = {
 export class PlansPage {
   readonly store = inject(DietStore);
   readonly qa = inject(QuickActions);
+  private readonly notify = inject(Notify);
   readonly labels = PLAN_STATUS_LABELS;
   readonly tone = STATUS_TONE;
   readonly filters: { value: PlanStatus | 'all'; label: string }[] = [
@@ -404,6 +480,8 @@ export class PlansPage {
   readonly inspectedPlanId = signal<string | null>('p-1');
   readonly showGrocery = signal(false);
   readonly groceryDays = signal(7);
+  readonly cloneTargetClientId = signal('');
+  readonly cloneTargetKcal = signal(1600);
 
   readonly rows = computed(() =>
     this.store
@@ -461,5 +539,99 @@ export class PlansPage {
     if (left < 0) return `${-left} gün önce bitti`;
     if (left === 0) return 'Bugün bitiyor';
     return `${left} gün kaldı`;
+  }
+
+  autoExchangeHint(item: MealFoodItem): string | null {
+    if (item.alternative) return item.alternative;
+    const match = this.store
+      .foods()
+      .find((f) => f.exchange === item.exchange && f.id !== item.foodId && f.name !== item.name);
+    return match ? `${item.portions} × ${match.unit} ${match.name}` : null;
+  }
+
+  onCloneClientChange(clientId: string): void {
+    this.cloneTargetClientId.set(clientId);
+    const view = this.store.view(clientId);
+    if (view) {
+      this.cloneTargetKcal.set(Math.max(1200, Math.round((view.tdee - 350) / 50) * 50));
+    }
+  }
+
+  cloneAndScalePlan(source: MealPlan): void {
+    const targetClientId = this.cloneTargetClientId();
+    if (!targetClientId) return;
+    const targetKcal = Math.max(1000, this.cloneTargetKcal() || source.kcal);
+    const ratio = source.kcal > 0 ? targetKcal / source.kcal : 1;
+    const scaledMeals = source.meals.map((meal) => ({
+      ...meal,
+      kcal: Math.round(meal.kcal * ratio),
+      proteinG: meal.proteinG ? round1(meal.proteinG * ratio) : undefined,
+      carbG: meal.carbG ? round1(meal.carbG * ratio) : undefined,
+      fatG: meal.fatG ? round1(meal.fatG * ratio) : undefined,
+      fiberG: meal.fiberG ? round1(meal.fiberG * ratio) : undefined,
+      items: meal.items?.map((it) => ({
+        ...it,
+        portions: round1(Math.max(0.5, it.portions * ratio)),
+        grams: Math.round(it.grams * ratio),
+        kcal: Math.round(it.kcal * ratio),
+        proteinG: round1(it.proteinG * ratio),
+        carbG: round1(it.carbG * ratio),
+        fatG: round1(it.fatG * ratio),
+        fiberG: round1(it.fiberG * ratio),
+      })),
+    }));
+
+    const start = isoDate(new Date());
+    const endObj = new Date();
+    endObj.setDate(endObj.getDate() + 14);
+
+    this.store.savePlan({
+      clientId: targetClientId,
+      title: `${source.title} (${targetKcal} kcal Ölçekli)`,
+      startDate: start,
+      endDate: isoDate(endObj),
+      kcal: targetKcal,
+      proteinPct: source.proteinPct,
+      carbPct: source.carbPct,
+      fatPct: source.fatPct,
+      meals: scaledMeals,
+      status: 'active',
+      notes: source.notes,
+    });
+
+    this.cloneTargetClientId.set('');
+    this.notify.success(
+      `Plan ${this.store.clientName(targetClientId)} için ${targetKcal} kcal'ye ölçeklenerek aktifleştirildi.`,
+    );
+  }
+
+  copyWhatsAppSummary(plan: MealPlan): void {
+    const clientName = this.store.clientName(plan.clientId);
+    const lines: string[] = [
+      `🌿 *OdivonDiet Klinik Beslenme Reçetesi*`,
+      `👤 *Danışan:* ${clientName}`,
+      `📋 *Program:* ${plan.title} (${plan.kcal} kcal)`,
+      `⚖️ *Makro Dağılımı:* %${plan.proteinPct} P / %${plan.carbPct} K / %${plan.fatPct} Y`,
+      ``,
+    ];
+    for (const meal of plan.meals) {
+      lines.push(`⏰ *${meal.time} — ${meal.name}* (${meal.kcal} kcal)`);
+      for (const item of meal.items ?? []) {
+        const alt = this.autoExchangeHint(item);
+        lines.push(
+          `  • ${item.name}: ${item.portions} × ${item.unit} (${item.grams}g)${alt ? ` _[Muadil: ${alt}]_` : ''}`,
+        );
+      }
+    }
+    if (plan.notes) {
+      lines.push(``, `📌 *Klinik Not:* ${plan.notes}`);
+    }
+    const text = lines.join('\n');
+    void globalThis.navigator?.clipboard?.writeText(text);
+    this.notify.success('WhatsApp beslenme reçetesi panoya kopyalandı.');
+  }
+
+  printPlan(): void {
+    globalThis.print?.();
   }
 }

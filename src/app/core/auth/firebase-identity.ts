@@ -1,26 +1,7 @@
 import { Injectable, signal } from '@angular/core';
-import { FirebaseApp, initializeApp } from 'firebase/app';
-import {
-  AppCheck,
-  ReCaptchaEnterpriseProvider,
-  getToken,
-  initializeAppCheck,
-} from 'firebase/app-check';
-import {
-  Auth,
-  User,
-  applyActionCode,
-  browserLocalPersistence,
-  createUserWithEmailAndPassword,
-  getAuth,
-  onAuthStateChanged,
-  reload,
-  sendEmailVerification,
-  setPersistence,
-  signInWithEmailAndPassword,
-  signOut,
-  updateProfile,
-} from 'firebase/auth';
+import type { FirebaseApp } from 'firebase/app';
+import type { AppCheck } from 'firebase/app-check';
+import type { Auth, User } from 'firebase/auth';
 import { environment } from '../../../environments/environment';
 
 @Injectable({ providedIn: 'root' })
@@ -34,19 +15,25 @@ export class FirebaseIdentity {
 
   async initialize(): Promise<void> {
     if (this.app || !environment.firebase.apiKey) return;
+    const [{ initializeApp }, authMod] = await Promise.all([
+      import('firebase/app'),
+      import('firebase/auth'),
+    ]);
     this.app = initializeApp(environment.firebase);
-    this.auth = getAuth(this.app);
-    await setPersistence(this.auth, browserLocalPersistence);
-    onAuthStateChanged(this.auth, (user) => this.user.set(user));
+    this.auth = authMod.getAuth(this.app);
+    await authMod.setPersistence(this.auth, authMod.browserLocalPersistence);
+    authMod.onAuthStateChanged(this.auth, (user) => this.user.set(user));
     if (environment.appCheckSiteKey) {
-      this.appCheck = initializeAppCheck(this.app, {
-        provider: new ReCaptchaEnterpriseProvider(environment.appCheckSiteKey),
+      const appCheckMod = await import('firebase/app-check');
+      this.appCheck = appCheckMod.initializeAppCheck(this.app, {
+        provider: new appCheckMod.ReCaptchaEnterpriseProvider(environment.appCheckSiteKey),
         isTokenAutoRefreshEnabled: true,
       });
     }
   }
 
   async idToken(): Promise<string | null> {
+    if (!this.configured) return null;
     await this.initialize();
     return this.auth?.currentUser?.getIdToken() ?? null;
   }
@@ -56,6 +43,7 @@ export class FirebaseIdentity {
    * Members only ever receive their own `clientId`, so the portal cannot read other clients.
    */
   async claims(): Promise<{ role?: string; clientId?: string }> {
+    if (!this.configured) return {};
     await this.initialize();
     const user = this.auth?.currentUser;
     if (!user) return {};
@@ -68,10 +56,12 @@ export class FirebaseIdentity {
   }
 
   async requestHeaders(): Promise<Record<string, string>> {
+    if (!this.configured) return {};
     const headers: Record<string, string> = {};
     const token = await this.idToken();
     if (token) headers['Authorization'] = `Bearer ${token}`;
     if (this.appCheck) {
+      const { getToken } = await import('firebase/app-check');
       const result = await getToken(this.appCheck, false);
       headers['X-Firebase-AppCheck'] = result.token;
     }
@@ -81,12 +71,14 @@ export class FirebaseIdentity {
   async signIn(email: string, password: string): Promise<User> {
     await this.initialize();
     if (!this.auth) throw new Error('Firebase Auth is not configured.');
+    const { signInWithEmailAndPassword } = await import('firebase/auth');
     return (await signInWithEmailAndPassword(this.auth, email, password)).user;
   }
 
   async register(name: string, email: string, password: string): Promise<User> {
     await this.initialize();
     if (!this.auth) throw new Error('Firebase Auth is not configured.');
+    const { createUserWithEmailAndPassword, updateProfile } = await import('firebase/auth');
     const user = (await createUserWithEmailAndPassword(this.auth, email, password)).user;
     await updateProfile(user, { displayName: name });
     await this.sendVerification(user);
@@ -96,6 +88,7 @@ export class FirebaseIdentity {
   /** Sends Firebase's verification e-mail; the link brings the user back to `/verify-email`. */
   async sendVerification(user = this.auth?.currentUser ?? null): Promise<void> {
     if (!user) throw new Error('No signed-in user to verify.');
+    const { sendEmailVerification } = await import('firebase/auth');
     await sendEmailVerification(user, {
       url: `${globalThis.location?.origin ?? ''}/verify-email`,
     });
@@ -103,9 +96,11 @@ export class FirebaseIdentity {
 
   /** Re-reads the signed-in user from Firebase and reports whether the e-mail is verified. */
   async refreshVerified(): Promise<boolean> {
+    if (!this.configured) return false;
     await this.initialize();
     const user = this.auth?.currentUser;
     if (!user) return false;
+    const { reload } = await import('firebase/auth');
     await reload(user);
     // Force a fresh ID token so MainAPI sees `email_verified: true`.
     if (user.emailVerified) await user.getIdToken(true);
@@ -116,11 +111,16 @@ export class FirebaseIdentity {
   async applyVerificationLink(oobCode: string): Promise<void> {
     await this.initialize();
     if (!this.auth) throw new Error('Firebase Auth is not configured.');
+    const { applyActionCode } = await import('firebase/auth');
     await applyActionCode(this.auth, oobCode);
   }
 
   async logout(): Promise<void> {
+    if (!this.configured) return;
     await this.initialize();
-    if (this.auth) await signOut(this.auth);
+    if (this.auth) {
+      const { signOut } = await import('firebase/auth');
+      await signOut(this.auth);
+    }
   }
 }

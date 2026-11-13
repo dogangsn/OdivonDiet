@@ -1,4 +1,6 @@
+import { HttpClient } from '@angular/common/http';
 import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
+import { environment } from '../../../environments/environment';
 import {
   BillingCycle,
   PlanId,
@@ -24,6 +26,7 @@ const PREFIX = 'odivon:sub:';
 @Injectable({ providedIn: 'root' })
 export class SubscriptionStore {
   private readonly auth = inject(AuthStore);
+  private readonly http = inject(HttpClient, { optional: true });
   /** Ticks once a minute so the days-left counter and expiry stay current. */
   private readonly now = signal(new Date());
   private readonly owner = computed(() => {
@@ -106,13 +109,15 @@ export class SubscriptionStore {
     }
     if (saved) {
       this.subscription.set(saved);
+      this.pullRemoteSubscription(owner);
       return;
     }
     this.subscription.set(null);
     this.save(createTrial(new Date()), owner);
+    this.pullRemoteSubscription(owner);
   }
 
-  private save(subscription: Subscription, owner = this.owner()): void {
+  private save(subscription: Subscription, owner = this.owner(), pushRemote = true): void {
     if (!owner) return;
     try {
       localStorage.setItem(PREFIX + owner, JSON.stringify(subscription));
@@ -120,5 +125,28 @@ export class SubscriptionStore {
       // keep it in memory
     }
     this.subscription.set(subscription);
+    if (pushRemote) {
+      this.pushRemoteSubscription(subscription);
+    }
+  }
+
+  private pullRemoteSubscription(owner: string): void {
+    const session = untracked(this.auth.session);
+    if (!this.http || !session || session.demo || owner === SAMPLE_WORKSPACE) return;
+    this.http.get<Subscription>(`${environment.apiBaseUrl}/diet/subscription`).subscribe({
+      next: (remote) => {
+        if (!remote || this.owner() !== owner) return;
+        this.save(remote, owner, false);
+      },
+      error: () => {},
+    });
+  }
+
+  private pushRemoteSubscription(subscription: Subscription): void {
+    const session = untracked(this.auth.session);
+    if (!this.http || !session || session.demo) return;
+    this.http
+      .put(`${environment.apiBaseUrl}/diet/subscription`, subscription)
+      .subscribe({ error: () => {} });
   }
 }

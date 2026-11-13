@@ -1,8 +1,9 @@
 import { DatePipe, DecimalPipe } from '@angular/common';
-import { Component, computed, inject } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { DietStore } from '../../core/data/diet-store';
 import { PortalStore } from '../../core/data/portal-store';
+import { isoDate } from '../../domain/diet-calc';
 import { PORTAL_ACCESS_LABELS } from '../../domain/portal.models';
 import {
   ACTIVITY_LABELS,
@@ -112,6 +113,99 @@ import { Notify } from '../../core/notify/notify';
               >BMR {{ v.bmr }} · {{ activityLabels[v.client.activity] }}</span
             >
           </div>
+        </section>
+
+        <!-- Canlı Seans & SOAP Klinik Kayıt Modu -->
+        <section class="odv-card border-violet-200 p-5 dark:border-violet-900/50" aria-label="Canlı seans ve SOAP kaydı">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <span class="odv-eyebrow">Tek Ekran Seans Yönetimi</span>
+              <h4 class="odv-section-title text-sm">Canlı Seans Modu & Hızlı SOAP Klinik Notu</h4>
+            </div>
+            <button
+              type="button"
+              class="odv-btn-soft !min-h-8 !px-3 text-xs font-bold"
+              (click)="toggleSessionMode(v.currentWeightKg)"
+            >
+              <span class="material-symbols-rounded !text-base" aria-hidden="true">
+                {{ sessionModeOpen() ? 'expand_less' : 'clinical_notes' }}
+              </span>
+              {{ sessionModeOpen() ? 'Seans Modunu Kapat' : 'Hızlı Seans & Tartı Gir' }}
+            </button>
+          </div>
+
+          @if (sessionModeOpen()) {
+            <div class="mt-4 space-y-3 border-t border-slate-100 pt-4 dark:border-slate-800">
+              <div class="grid gap-3 sm:grid-cols-3">
+                <label class="block">
+                  <span class="odv-label">Bugünkü Tartı (kg)</span>
+                  <input
+                    type="number"
+                    step="0.1"
+                    class="odv-input tabular text-xs"
+                    [value]="sessionWeightKg()"
+                    (input)="sessionWeightKg.set(+$any($event.target).value || v.currentWeightKg)"
+                  />
+                </label>
+                <label class="block">
+                  <span class="odv-label">Bel Çevresi (cm · opsiyonel)</span>
+                  <input
+                    type="number"
+                    step="0.5"
+                    class="odv-input tabular text-xs"
+                    [value]="sessionWaistCm() ?? ''"
+                    (input)="sessionWaistCm.set($any($event.target).value ? +$any($event.target).value : null)"
+                    placeholder="Örn. 76"
+                  />
+                </label>
+                <label class="block">
+                  <span class="odv-label">Seans Plan Uyumu (1–5)</span>
+                  <select
+                    class="odv-input text-xs"
+                    [value]="sessionAdherence()"
+                    (change)="sessionAdherence.set(+$any($event.target).value)"
+                  >
+                    <option value="5">5 / 5 — Tam Uyum</option>
+                    <option value="4">4 / 5 — Yüksek Uyum</option>
+                    <option value="3">3 / 5 — Orta Uyum</option>
+                    <option value="2">2 / 5 — Düşük Uyum</option>
+                    <option value="1">1 / 5 — Uyumsuz</option>
+                  </select>
+                </label>
+              </div>
+
+              <label class="block">
+                <span class="odv-label">SOAP Klinik Gözlem (Uyku, Sindirim, Ödem, Şikayet)</span>
+                <textarea
+                  class="odv-input min-h-16 text-xs"
+                  [value]="soapNote()"
+                  (input)="soapNote.set($any($event.target).value)"
+                  placeholder="S: Uyku 7s, şişkinlik azaldı. O: Tartıda yağ kaybı devam ediyor. A: İnsülin direnci protokolüne yanıt olumlu."
+                ></textarea>
+              </label>
+
+              <label class="block">
+                <span class="odv-label">Sonraki Seans Hedefi & Aksiyon</span>
+                <input
+                  class="odv-input text-xs"
+                  [value]="soapNextAction()"
+                  (input)="soapNextAction.set($any($event.target).value)"
+                  placeholder="Örn. Su hedefi 2.5L, akşam yürüyüşü 35 dk, D vitamini kontrolü"
+                />
+              </label>
+
+              <div class="flex justify-end">
+                <button
+                  type="button"
+                  class="odv-btn-primary !min-h-9 text-xs"
+                  (click)="saveLiveSession(v.client.id)"
+                >
+                  <span class="material-symbols-rounded !text-base" aria-hidden="true">task_alt</span>
+                  Tartıyı ve SOAP Seans Kaydını Tamamla
+                </button>
+              </div>
+            </div>
+          }
         </section>
 
         <section class="odv-card p-5" aria-label="Danışan portalı">
@@ -312,6 +406,12 @@ export class ClientDetail {
   readonly channelLabels = CHANNEL_LABELS;
   readonly channelIcons = CHANNEL_ICONS;
   readonly open = computed(() => this.qa.state()?.kind === 'client-detail');
+  readonly sessionModeOpen = signal(false);
+  readonly sessionWeightKg = signal(70);
+  readonly sessionWaistCm = signal<number | null>(null);
+  readonly sessionAdherence = signal(5);
+  readonly soapNote = signal('');
+  readonly soapNextAction = signal('');
   readonly view = computed(() => {
     const id = this.qa.state()?.clientId;
     return id ? this.store.view(id) : undefined;
@@ -407,5 +507,52 @@ export class ClientDetail {
     }
     this.store.setClientStatus(v.client.id, status);
     this.notify.success(status === 'archived' ? 'Danışan arşivlendi' : 'Danışan durumu güncellendi');
+  }
+
+  toggleSessionMode(currentWeight: number): void {
+    this.sessionWeightKg.set(currentWeight);
+    this.sessionModeOpen.update((open) => !open);
+  }
+
+  saveLiveSession(clientId: string): void {
+    const weight = this.sessionWeightKg();
+    if (weight >= 30 && weight <= 250) {
+      this.store.addMeasurement({
+        clientId,
+        date: isoDate(new Date()),
+        weightKg: weight,
+        waistCm: this.sessionWaistCm(),
+        hipCm: null,
+        bodyFatPct: null,
+        note: this.soapNote().trim() || 'Canlı seans ölçümü',
+      });
+    }
+
+    const scheduled = this.store
+      .consultations()
+      .find((c) => c.clientId === clientId && c.status === 'scheduled');
+    if (scheduled) {
+      this.store.completeConsultation(
+        scheduled.id,
+        this.sessionAdherence(),
+        this.soapNote().trim() || 'SOAP kontrol görüşmesi tamamlandı.',
+        this.soapNextAction().trim(),
+      );
+    } else {
+      this.store.addConsultation({
+        clientId,
+        at: new Date().toISOString(),
+        channel: 'clinic',
+        status: 'done',
+        adherence: this.sessionAdherence(),
+        notes: this.soapNote().trim() || 'SOAP kontrol görüşmesi tamamlandı.',
+        nextAction: this.soapNextAction().trim(),
+      });
+    }
+
+    this.soapNote.set('');
+    this.soapNextAction.set('');
+    this.sessionModeOpen.set(false);
+    this.notify.success('Seans ölçümü ve SOAP klinik kaydı tamamlandı.');
   }
 }

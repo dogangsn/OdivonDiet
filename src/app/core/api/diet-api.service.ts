@@ -1,7 +1,11 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable, catchError, of } from 'rxjs';
+import { Observable, catchError, map, of } from 'rxjs';
 import { environment } from '../../../environments/environment';
+import type { Subscription } from '../../domain/billing';
+import type { DietData } from '../data/diet-store';
+import type { PortalData } from '../data/portal-store';
+import { PORTAL_API } from './portal-contract';
 
 export interface DietClient {
   id: string | number;
@@ -50,6 +54,27 @@ export interface BodyMeasurement {
   hipCm?: number;
 }
 
+export interface PracticeSettings {
+  readonly dietitianName: string;
+  readonly practiceName: string;
+  readonly specialty: string;
+  readonly licenseNo: string;
+  readonly sessionDurationMin: 30 | 45 | 60;
+  readonly unitSystem: 'metric';
+  readonly notifications: {
+    readonly reminder: boolean;
+    readonly overdue: boolean;
+    readonly weekly: boolean;
+    readonly portalMessage: boolean;
+  };
+}
+
+export interface AttachmentUploadTicket {
+  readonly attachmentId: string;
+  readonly uploadUrl: string;
+  readonly downloadUrl: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class DietApiService {
   private readonly http = inject(HttpClient);
@@ -77,6 +102,92 @@ export class DietApiService {
   saveNutritionPlan(plan: Partial<NutritionPlan>): Observable<NutritionPlan> {
     return this.http.post<NutritionPlan>(`${this.baseUrl}/plans`, plan).pipe(
       catchError(() => of({ ...plan, id: `plan-${Date.now()}` } as NutritionPlan)),
+    );
+  }
+
+  /** Fetches the authenticated clinic's full workspace state from MainAPI. */
+  fetchWorkspace(): Observable<DietData | null> {
+    return this.http
+      .get<DietData>(`${this.baseUrl}/workspace`)
+      .pipe(catchError(() => of(null)));
+  }
+
+  /** Pushes workspace state changes to MainAPI (`/api/v1/diet/workspace`). */
+  syncWorkspace(data: DietData): Observable<boolean> {
+    return this.http.put(`${this.baseUrl}/workspace`, data).pipe(
+      map(() => true),
+      catchError(() => of(false)),
+    );
+  }
+
+  /** Fetches the clinic's portal conversations, tasks, and member requests from MainAPI. */
+  fetchPortalWorkspace(): Observable<PortalData | null> {
+    return this.http
+      .get<PortalData>(`${this.baseUrl}/portal/workspace`)
+      .pipe(catchError(() => of(null)));
+  }
+
+  /** Pushes portal state to MainAPI (`/api/v1/diet/portal/workspace`). */
+  syncPortalWorkspace(data: PortalData): Observable<boolean> {
+    return this.http.put(`${this.baseUrl}/portal/workspace`, data).pipe(
+      map(() => true),
+      catchError(() => of(false)),
+    );
+  }
+
+  /** Sends a portal invitation via MainAPI so Firebase sets custom claims (`role: 'member'`, `clientId`). */
+  invitePortalMember(clientId: string, email: string): Observable<boolean> {
+    return this.http
+      .post(`${environment.apiBaseUrl}${PORTAL_API.invite(clientId).replace('/api/v1', '')}`, {
+        email,
+      })
+      .pipe(
+        map(() => true),
+        catchError(() => of(false)),
+      );
+  }
+
+  /** Revokes a client's member portal login on MainAPI. */
+  disablePortalMember(clientId: string): Observable<boolean> {
+    return this.http
+      .post(`${environment.apiBaseUrl}${PORTAL_API.disable(clientId).replace('/api/v1', '')}`, {})
+      .pipe(
+        map(() => true),
+        catchError(() => of(false)),
+      );
+  }
+
+  /** Requests a short-lived signed upload URL for a clinical attachment (PDF lab report or meal photo). */
+  createAttachmentUpload(input: {
+    name: string;
+    mimeType: string;
+    sizeBytes: number;
+  }): Observable<AttachmentUploadTicket | null> {
+    return this.http
+      .post<AttachmentUploadTicket>(`${this.baseUrl}/attachments`, input)
+      .pipe(catchError(() => of(null)));
+  }
+
+  /** Fetches the clinic's SaaS subscription state from MainAPI. */
+  fetchSubscription(): Observable<Subscription | null> {
+    return this.http
+      .get<Subscription>(`${this.baseUrl}/subscription`)
+      .pipe(catchError(() => of(null)));
+  }
+
+  /** Persists subscription changes (trial, plan request, or confirmed PayTR payment) to MainAPI. */
+  syncSubscription(subscription: Subscription): Observable<boolean> {
+    return this.http.put(`${this.baseUrl}/subscription`, subscription).pipe(
+      map(() => true),
+      catchError(() => of(false)),
+    );
+  }
+
+  /** Saves clinic profile & notification preferences to MainAPI. */
+  savePracticeSettings(settings: PracticeSettings): Observable<boolean> {
+    return this.http.put(`${this.baseUrl}/settings`, settings).pipe(
+      map(() => true),
+      catchError(() => of(false)),
     );
   }
 

@@ -16,6 +16,9 @@ import { VersionBadge } from '../shared/ui/version-badge';
 @Component({
   selector: 'app-shell',
   imports: [RouterLink, RouterLinkActive, RouterOutlet, Avatar, QuickActionHost, VersionBadge],
+  host: {
+    '(window:keydown)': 'onGlobalKeydown($event)',
+  },
   template: `
     <div class="min-h-screen text-slate-900 dark:text-slate-100">
       <a
@@ -190,12 +193,28 @@ import { VersionBadge } from '../shared/ui/version-badge';
               #searchInput
               id="global-search"
               type="search"
-              class="odv-input !py-2 ps-10"
+              class="odv-input !py-2 pe-16 ps-10"
               placeholder="Danışan ara…"
               autocomplete="off"
             />
+            <button
+              type="button"
+              (click)="paletteOpen.set(true)"
+              aria-label="Hızlı komut paletini aç (Ctrl+K)"
+              class="absolute end-2 top-1/2 -translate-y-1/2 rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-bold text-slate-500 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+            >
+              Ctrl K
+            </button>
           </form>
           <div class="ms-auto flex items-center gap-1.5">
+            <button
+              type="button"
+              class="odv-btn-ghost !min-h-9 !px-2.5 text-xs md:hidden"
+              (click)="paletteOpen.set(true)"
+              aria-label="Hızlı arama ve komut paleti"
+            >
+              <span class="material-symbols-rounded !text-lg">search</span>
+            </button>
             <button
               type="button"
               class="odv-btn-primary !min-h-9 !px-3"
@@ -233,6 +252,119 @@ import { VersionBadge } from '../shared/ui/version-badge';
       </div>
 
       <app-quick-action-host />
+
+      @if (paletteOpen()) {
+        <div
+          class="fixed inset-0 z-50 flex items-start justify-center bg-slate-950/50 p-4 pt-16 backdrop-blur-xs"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Hızlı arama ve komut paleti"
+        >
+          <div
+            class="w-full max-w-xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900"
+          >
+            <div class="flex items-center gap-3 border-b border-slate-100 px-4 py-3 dark:border-slate-800">
+              <span class="material-symbols-rounded text-violet-600" aria-hidden="true">bolt</span>
+              <label class="sr-only" for="palette-input">Komut veya danışan ara</label>
+              <input
+                id="palette-input"
+                type="search"
+                class="flex-1 bg-transparent text-sm font-medium outline-none"
+                placeholder="Danışan adı, hızlı işlem veya modül yazın…"
+                [value]="paletteQuery()"
+                (input)="paletteQuery.set($any($event.target).value)"
+                autocomplete="off"
+              />
+              <button
+                type="button"
+                class="rounded-lg border border-slate-200 px-2 py-1 text-xs font-bold text-slate-500 hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
+                (click)="paletteOpen.set(false)"
+              >
+                ESC
+              </button>
+            </div>
+
+            <div class="custom-scroll max-h-96 space-y-4 overflow-y-auto p-4">
+              <div>
+                <p class="mb-2 text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
+                  Hızlı Klinik İşlemler
+                </p>
+                <div class="grid gap-1.5 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    (click)="runQuickAction('client-new')"
+                    class="flex items-center gap-2.5 rounded-xl border border-slate-100 p-2.5 text-start text-xs font-bold hover:border-violet-300 hover:bg-violet-50/50 dark:border-slate-800 dark:hover:bg-slate-800"
+                  >
+                    <span class="material-symbols-rounded !text-base text-violet-600">person_add</span>
+                    Yeni Danışan Ekle
+                  </button>
+                  <button
+                    type="button"
+                    (click)="runQuickAction('plan')"
+                    class="flex items-center gap-2.5 rounded-xl border border-slate-100 p-2.5 text-start text-xs font-bold hover:border-violet-300 hover:bg-violet-50/50 dark:border-slate-800 dark:hover:bg-slate-800"
+                  >
+                    <span class="material-symbols-rounded !text-base text-emerald-600"
+                      >restaurant_menu</span
+                    >
+                    Yeni Beslenme Programı
+                  </button>
+                  <button
+                    type="button"
+                    (click)="runQuickAction('measurement')"
+                    class="flex items-center gap-2.5 rounded-xl border border-slate-100 p-2.5 text-start text-xs font-bold hover:border-violet-300 hover:bg-violet-50/50 dark:border-slate-800 dark:hover:bg-slate-800"
+                  >
+                    <span class="material-symbols-rounded !text-base text-sky-600"
+                      >monitor_weight</span
+                    >
+                    InBody / Ölçüm Kaydet
+                  </button>
+                  <button
+                    type="button"
+                    (click)="runQuickAction('consultation')"
+                    class="flex items-center gap-2.5 rounded-xl border border-slate-100 p-2.5 text-start text-xs font-bold hover:border-violet-300 hover:bg-violet-50/50 dark:border-slate-800 dark:hover:bg-slate-800"
+                  >
+                    <span class="material-symbols-rounded !text-base text-amber-600">event</span>
+                    Yeni Randevu Planla
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <p class="mb-2 text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
+                  Danışanlar ({{ paletteClients().length }})
+                </p>
+                <ul class="space-y-1">
+                  @for (v of paletteClients(); track v.client.id) {
+                    <li>
+                      <button
+                        type="button"
+                        (click)="openClientFromPalette(v.client.id)"
+                        class="flex w-full items-center justify-between rounded-xl px-3 py-2 text-start text-xs hover:bg-slate-50 dark:hover:bg-slate-800"
+                      >
+                        <span class="flex items-center gap-2.5">
+                          <app-avatar [name]="v.fullName" size="sm" />
+                          <span>
+                            <strong class="block text-slate-800 dark:text-white">{{
+                              v.fullName
+                            }}</strong>
+                            <span class="text-[11px] text-slate-500"
+                              >{{ v.currentWeightKg }} kg → Hedef {{ v.client.targetWeightKg }} kg ·
+                              TDEE {{ v.tdee }} kcal</span
+                            >
+                          </span>
+                        </span>
+                        <span class="odv-badge odv-tone-primary">360° Profil Aç</span>
+                      </button>
+                    </li>
+                  } @empty {
+                    <li class="px-2 py-2 text-xs text-slate-400">Eşleşen danışan bulunamadı.</li>
+                  }
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      }
     </div>
   `,
 })
@@ -248,6 +380,21 @@ export class AppShell {
   private readonly portal = inject(PortalStore);
   private readonly router = inject(Router);
   readonly mobileOpen = signal(false);
+  readonly paletteOpen = signal(false);
+  readonly paletteQuery = signal('');
+
+  readonly paletteClients = computed(() => {
+    const q = this.paletteQuery().trim().toLocaleLowerCase('tr');
+    const list = this.store.activeClients();
+    if (!q) return list.slice(0, 5);
+    return list
+      .filter(
+        (v) =>
+          v.fullName.toLocaleLowerCase('tr').includes(q) ||
+          v.client.email.toLocaleLowerCase('tr').includes(q),
+      )
+      .slice(0, 6);
+  });
 
   readonly trialPillClass = computed(() => {
     const s = this.subs.state();
@@ -293,5 +440,24 @@ export class AppShell {
   logout(): void {
     this.auth.logout();
     void this.router.navigateByUrl('/login');
+  }
+
+  onGlobalKeydown(event: KeyboardEvent): void {
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+      event.preventDefault();
+      this.paletteOpen.update((v) => !v);
+    } else if (event.key === 'Escape' && this.paletteOpen()) {
+      this.paletteOpen.set(false);
+    }
+  }
+
+  runQuickAction(kind: 'client-new' | 'plan' | 'measurement' | 'consultation'): void {
+    this.paletteOpen.set(false);
+    this.qa.open(kind);
+  }
+
+  openClientFromPalette(clientId: string): void {
+    this.paletteOpen.set(false);
+    this.qa.open('client-detail', clientId);
   }
 }

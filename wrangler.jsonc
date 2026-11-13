@@ -6,6 +6,10 @@
   "observability": {
     "enabled": true
   },
+  "vars": {
+    "MAIN_API_BASE_URL": "https://mainapi.odivon.com/api/v1",
+    "PAYTR_TEST_MODE": "0"
+  },
   "assets": {
     "directory": "dist/OdivonDiet/browser",
     "binding": "ASSETS",

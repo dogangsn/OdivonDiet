@@ -69,4 +69,37 @@ describe('DietApiService', () => {
     expect(result.title).toBe('Akdeniz Beslenme Planı');
     expect(result.id).toBe('plan-999');
   });
+
+  it('synchronizes clinic workspace, settings, and attachment upload tickets with MainAPI', async () => {
+    const ticketPromise = firstValueFrom(
+      service.createAttachmentUpload({
+        name: 'tahlil.pdf',
+        mimeType: 'application/pdf',
+        sizeBytes: 124_000,
+      }),
+    );
+    const reqTicket = httpTesting.expectOne('https://mainapi.odivon.com/api/v1/diet/attachments');
+    reqTicket.flush({
+      attachmentId: 'att-1',
+      uploadUrl: 'https://storage.odivon.com/upload/att-1',
+      downloadUrl: 'https://storage.odivon.com/dl/att-1',
+    });
+    const ticket = await ticketPromise;
+    expect(ticket?.attachmentId).toBe('att-1');
+
+    const settingsPromise = firstValueFrom(
+      service.savePracticeSettings({
+        dietitianName: 'Dyt. Deniz',
+        practiceName: 'Levent Klinik',
+        specialty: 'Metabolik Beslenme',
+        licenseNo: 'TR-100',
+        sessionDurationMin: 45,
+        unitSystem: 'metric',
+        notifications: { reminder: true, overdue: true, weekly: false, portalMessage: true },
+      }),
+    );
+    const reqSettings = httpTesting.expectOne('https://mainapi.odivon.com/api/v1/diet/settings');
+    reqSettings.flush({ ok: true });
+    expect(await settingsPromise).toBe(true);
+  });
 });

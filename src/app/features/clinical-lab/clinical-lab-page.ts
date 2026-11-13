@@ -184,7 +184,7 @@ type PhysiologicalModifier =
                   [attr.aria-pressed]="activeTab() === 'equations'"
                   (click)="activeTab.set('equations')"
                 >
-                  5. Çoklu BMR & Gebelik/Stres
+                  5. Çoklu BMR, Kadın Sağlığı & FODMAP
                 </button>
               </div>
             </section>
@@ -1026,6 +1026,131 @@ type PhysiologicalModifier =
                     }
                   </div>
                 </section>
+
+                <!-- KADIN SAĞLIĞI: MENSTRÜEL DÖNGÜ (LUTEAL ÖDEM DÜZELTMESİ) & GEBELİK/EMZİRME MİKROBESİN PROTOKOLÜ -->
+                <section
+                  class="odv-card border-violet-200/80 p-5 dark:border-violet-900/50"
+                  aria-label="Kadın sağlığı menstrüel döngü ve gebelik protokolü"
+                >
+                  <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <span class="odv-eyebrow text-violet-600 dark:text-violet-300">
+                        Kadın Sağlığı & Hormonal Döngü Adaptasyonu
+                      </span>
+                      <h3 class="odv-section-title mt-0.5">
+                        Luteal Faz Ödem Düzeltmesi & Gebelik / Laktasyon Mikrobesin Matrisi
+                      </h3>
+                      <p class="text-xs text-slate-500">
+                        Seçili fizyolojik duruma göre tartıdaki ödem sapmasını düzeltir ve kanıta dayalı
+                        mikrobesin hedeflerini hesaplar.
+                      </p>
+                    </div>
+                    <span class="odv-badge odv-tone-primary">{{ womensHealthSummary().badge }}</span>
+                  </div>
+
+                  <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <div class="rounded-2xl bg-slate-50 p-3.5 dark:bg-slate-800/60">
+                      <span class="text-[11px] font-bold text-slate-400">Tartıdaki Güncel Ağırlık</span>
+                      <strong class="tabular mt-1 block text-xl font-extrabold">
+                        {{ v.currentWeightKg }} kg
+                      </strong>
+                      <span class="text-[11px] text-slate-500">Son ölçüm kaydı</span>
+                    </div>
+                    <div class="rounded-2xl bg-violet-50/70 p-3.5 dark:bg-violet-950/30">
+                      <span class="text-[11px] font-bold text-violet-700 dark:text-violet-300">
+                        Ödem Arındırılmış Gerçek Ağırlık
+                      </span>
+                      <strong class="tabular mt-1 block text-xl font-extrabold text-violet-700 dark:text-violet-200">
+                        {{ womensHealthSummary().trueWeightKg }} kg
+                      </strong>
+                      <span class="text-[11px] text-violet-600 dark:text-violet-300">
+                        Tahmini sıvı tutulumu: {{ womensHealthSummary().edemaOffsetKg }} kg
+                      </span>
+                    </div>
+                    <div class="rounded-2xl bg-emerald-50/70 p-3.5 dark:bg-emerald-950/30">
+                      <span class="text-[11px] font-bold text-emerald-700 dark:text-emerald-300">
+                        Ek Günlük Protein & Enerji
+                      </span>
+                      <strong class="tabular mt-1 block text-xl font-extrabold text-emerald-700 dark:text-emerald-200">
+                        {{ womensHealthSummary().extraKcal }} kcal · +{{ womensHealthSummary().extraProteinG }}g P
+                      </strong>
+                      <span class="text-[11px] text-emerald-700 dark:text-emerald-300">
+                        {{ womensHealthSummary().macroHint }}
+                      </span>
+                    </div>
+                    <div class="rounded-2xl bg-amber-50/70 p-3.5 dark:bg-amber-950/30">
+                      <span class="text-[11px] font-bold text-amber-800 dark:text-amber-300">
+                        Kritik Mikrobesin Hedefi
+                      </span>
+                      <strong class="mt-1 block text-sm font-extrabold text-amber-900 dark:text-amber-200">
+                        {{ womensHealthSummary().micronutrients }}
+                      </strong>
+                      <span class="mt-0.5 block text-[11px] text-amber-700 dark:text-amber-300">
+                        {{ womensHealthSummary().clinicalTip }}
+                      </span>
+                    </div>
+                  </div>
+                </section>
+
+                <!-- SİNDİRİM & DÜŞÜK FODMAP ELİMİNASYON / MUADİL RADARI -->
+                <section
+                  class="odv-card p-5"
+                  aria-label="İBS ve düşük FODMAP mutfak muadilleri"
+                >
+                  <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <span class="odv-eyebrow text-emerald-600">Gastroenteroloji & İBS Desteği</span>
+                      <h3 class="odv-section-title mt-0.5">
+                        Düşük FODMAP Fermente Oligosakkarit / Poliol Mutfak Muadil Tablosu
+                      </h3>
+                    </div>
+                    <div class="flex flex-wrap gap-1.5">
+                      @for (grp of fodmapGroups; track grp.id) {
+                        <button
+                          type="button"
+                          class="rounded-xl px-2.5 py-1 text-xs font-bold transition"
+                          [class]="
+                            selectedFodmapId() === grp.id
+                              ? 'bg-emerald-600 text-white'
+                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300'
+                          "
+                          (click)="selectedFodmapId.set(grp.id)"
+                        >
+                          {{ grp.code }}
+                        </button>
+                      }
+                    </div>
+                  </div>
+
+                  @if (activeFodmapGroup(); as fg) {
+                    <div class="mt-4 grid gap-3 md:grid-cols-3">
+                      <div class="rounded-xl border border-rose-200 bg-rose-50/50 p-3.5 dark:border-rose-900/50 dark:bg-rose-950/20">
+                        <span class="text-[11px] font-bold uppercase text-rose-600">
+                          Yüksek FODMAP Tetikleyiciler (2–6 Hafta Kısıtla)
+                        </span>
+                        <p class="mt-1 text-xs font-semibold text-slate-800 dark:text-slate-100">
+                          {{ fg.highTriggers }}
+                        </p>
+                      </div>
+                      <div class="rounded-xl border border-emerald-200 bg-emerald-50/50 p-3.5 dark:border-emerald-900/50 dark:bg-emerald-950/20">
+                        <span class="text-[11px] font-bold uppercase text-emerald-700">
+                          Güvenli Düşük FODMAP Muadilleri
+                        </span>
+                        <p class="mt-1 text-xs font-semibold text-slate-800 dark:text-slate-100">
+                          {{ fg.safeSwaps }}
+                        </p>
+                      </div>
+                      <div class="rounded-xl border border-violet-200 bg-violet-50/50 p-3.5 dark:border-violet-900/50 dark:bg-violet-950/20">
+                        <span class="text-[11px] font-bold uppercase text-violet-700">
+                          Yeniden Tanıtım (Re-Challenge) Dozu
+                        </span>
+                        <p class="mt-1 text-xs font-semibold text-slate-800 dark:text-slate-100">
+                          {{ fg.rechallengeProtocol }}
+                        </p>
+                      </div>
+                    </div>
+                  }
+                </section>
               </div>
             }
           </div>
@@ -1043,6 +1168,125 @@ export class ClinicalLabPage {
   readonly activeTab = signal<ClinicalTab>('labs');
   readonly showLabForm = signal(false);
   readonly modifier = signal<PhysiologicalModifier>('standard');
+  readonly selectedFodmapId = signal<string>('fructans');
+
+  readonly fodmapGroups = [
+    {
+      id: 'fructans',
+      code: 'Fruktanlar (Soğan/Sarımsak/Buğday)',
+      highTriggers: 'Kuru soğan, sarımsak, beyaz buğday ekmeği, çavdar, enginar, pırasa beyazı',
+      safeSwaps: 'Sarımsak aromalı zeytinyağı, taze soğanın yeşil yaprakları, karabuğday, kinoa, yulaf',
+      rechallengeProtocol: '1. Gün: 1/4 diş sarımsak · 2. Gün: 1/2 diş · 3. Gün: 1 tam diş (72 saat semptom izlemi)',
+    },
+    {
+      id: 'gos',
+      code: 'GOS (Baklagiller & Kuruyemiş)',
+      highTriggers: 'Kuru fasulye, nohut, mercimek (haşlama suyuyla), kaju, Antep fıstığı',
+      safeSwaps: 'Suda bekletilip iyice durulanmış kırmızı mercimek (≤1/2 su bardağı), ceviz, kabak çekirdeği, yer fıstığı',
+      rechallengeProtocol: '1. Gün: 2 yemek kaşığı haşlanmış nohut · 2. Gün: 4 yemek kaşığı · 3. Gün: 1/2 kase',
+    },
+    {
+      id: 'lactose',
+      code: 'Laktoz (Süt Ürünleri)',
+      highTriggers: 'Standart inek/keçi sütü, yumuşak taze peynirler, dondurma, krema',
+      safeSwaps: 'Laktozsuz süt/yoğurt/kefir, sert olgunlaştırılmış peynirler (eski kaşar, tulum), badem sütü',
+      rechallengeProtocol: '1. Gün: 60 ml süt · 2. Gün: 125 ml süt · 3. Gün: 200 ml süt',
+    },
+    {
+      id: 'fructose',
+      code: 'Serbest Fruktoz (Meyve/Bal)',
+      highTriggers: 'Elma, armut, karpuz, incir, mango, bal, agav şurubu',
+      safeSwaps: 'Çilek, yaban mersini, kivi, mandalina, sert muz, akçaağaç şurubu',
+      rechallengeProtocol: '1. Gün: 1 çay kaşığı bal · 2. Gün: 1 tatlı kaşığı · 3. Gün: 1 yemek kaşığı',
+    },
+    {
+      id: 'polyols',
+      code: 'Polioller (Sorbitol/Mannitol)',
+      highTriggers: 'Karnabahar, mantar, avokado (>1/4 adet), erik, kiraz, şeftali, şekersiz sakızlar',
+      safeSwaps: 'Brokoli çiçekleri, kabak, ıspanak, havuç, 1/8 dilim avokado (güvenli porsiyon)',
+      rechallengeProtocol: '1. Gün: 2 adet mantar veya 2 çiçek karnabahar · 2. Gün: 4 adet · 3. Gün: 1 porsiyon',
+    },
+  ];
+
+  readonly activeFodmapGroup = computed(
+    () => this.fodmapGroups.find((g) => g.id === this.selectedFodmapId()) ?? this.fodmapGroups[0],
+  );
+
+  readonly womensHealthSummary = computed(() => {
+    const v = this.selectedClient();
+    const currentW = v?.currentWeightKg ?? 65;
+    const mod = this.modifier();
+    if (mod === 'luteal_phase') {
+      return {
+        badge: 'Luteal Faz (Gün 17–28) · Progesteron Piki',
+        edemaOffsetKg: 1.4,
+        trueWeightKg: round1(currentW - 1.4),
+        extraKcal: '+140',
+        extraProteinG: 10,
+        macroHint: 'Serotonin düşüşüne karşı kompleks KH + %85 bitter çikolata',
+        micronutrients: 'Magnezyum Bisglisinat 300 mg + B6 (P5P) 25 mg',
+        clinicalTip: 'Aldosteron kaynaklı 1–1,5 kg ödem normaldir; tartı artışını yağ kazanımı olarak yorumlamayın.',
+      };
+    }
+    if (mod === 'pregnancy_t1') {
+      return {
+        badge: 'Gebelik 1. Trimester (Hafta 1–13)',
+        edemaOffsetKg: 0.5,
+        trueWeightKg: round1(currentW - 0.5),
+        extraKcal: '+150',
+        extraProteinG: 10,
+        macroHint: 'Sabah bulantısına karşı kuru kompleks KH + zencefil/B6',
+        micronutrients: 'Metilfolat 600 mcg + İyot 150 mcg + D3 2000 IU',
+        clinicalTip: 'Nöral tüp gelişimi için folat ve kolin (450 mg/gün) önceliklidir.',
+      };
+    }
+    if (mod === 'pregnancy_t2') {
+      return {
+        badge: 'Gebelik 2. Trimester (Hafta 14–27)',
+        edemaOffsetKg: 1.8,
+        trueWeightKg: round1(currentW - 1.8),
+        extraKcal: '+340',
+        extraProteinG: 20,
+        macroHint: 'Artan kan hacmi için hem-demir + C vitamini eşleşmesi',
+        micronutrients: 'Demir 27 mg + Kalsiyum 1000 mg + DHA 300 mg',
+        clinicalTip: 'Demir ve kalsiyum takviyeleri emilim rekabeti nedeniyle en az 2 saat arayla alınmalıdır.',
+      };
+    }
+    if (mod === 'pregnancy_t3') {
+      return {
+        badge: 'Gebelik 3. Trimester (Hafta 28–40)',
+        edemaOffsetKg: 2.6,
+        trueWeightKg: round1(currentW - 2.6),
+        extraKcal: '+452',
+        extraProteinG: 25,
+        macroHint: 'Fetal beyin miyelinizasyonu için yüksek DHA & Kolin',
+        micronutrients: 'Omega-3 DHA 300–500 mg + Demir 27 mg + Magnezyum',
+        clinicalTip: 'Mide kapasitesi azaldığı için 3 ana + 3 küçük yoğun besleyici ara öğün planlayın.',
+      };
+    }
+    if (mod === 'lactation') {
+      return {
+        badge: 'Emzirme / Laktasyon Dönemi',
+        edemaOffsetKg: 0.8,
+        trueWeightKg: round1(currentW - 0.8),
+        extraKcal: '+500',
+        extraProteinG: 25,
+        macroHint: 'Süt üretimi için +750 ml ek su (Toplam 3.0–3.5 L/gün)',
+        micronutrients: 'İyot 290 mcg + Kolin 550 mg + Kalsiyum 1000 mg',
+        clinicalTip: 'Hızlı kalorik kısıtlama (<1500 kcal) prolaktin ve süt hacmini düşürür; ılımlı açık uygulayın.',
+      };
+    }
+    return {
+      badge: 'Foliküler / Standart Bazal Fizyoloji',
+      edemaOffsetKg: 0,
+      trueWeightKg: currentW,
+      extraKcal: '+0',
+      extraProteinG: 0,
+      macroHint: 'İnsülin duyarlılığının en yüksek olduğu standart metabolik evre',
+      micronutrients: 'D3 1000–2000 IU + Omega-3 EPA/DHA + Lif ≥28 g/gün',
+      clinicalTip: 'Luteal faz ödemi veya gebelik/laktasyon durumu varsa üstteki seçiciden değiştirin.',
+    };
+  });
 
   readonly timingLabels = SUPPLEMENT_TIMING_LABELS;
   readonly glp1StageEntries = Object.entries(GLP1_STAGE_LABELS) as [Glp1Stage, string][];

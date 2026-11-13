@@ -121,10 +121,126 @@ interface FoodDraft {
                 kalori otomatik hesaplanır.
               </p>
             </div>
-            <button type="button" class="odv-btn-ghost !min-h-9 text-xs" (click)="closeEditor()">
-              <span class="material-symbols-rounded !text-base">close</span>Kapat
-            </button>
+            <div class="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                class="odv-btn-soft !min-h-9 text-xs font-bold"
+                (click)="recipeBuilderOpen.update((v) => !v)"
+              >
+                <span class="material-symbols-rounded !text-base" aria-hidden="true">blender</span>
+                {{
+                  recipeBuilderOpen()
+                    ? 'Malzeme Hesaplayıcıyı Gizle'
+                    : 'Çoklu Malzemeden Otomatik Tarif Hesapla'
+                }}
+              </button>
+              <button type="button" class="odv-btn-ghost !min-h-9 text-xs" (click)="closeEditor()">
+                <span class="material-symbols-rounded !text-base">close</span>Kapat
+              </button>
+            </div>
           </div>
+
+          @if (recipeBuilderOpen()) {
+            <div
+              class="mt-4 space-y-3 rounded-xl border border-violet-200 bg-violet-50/50 p-4 dark:border-violet-900/50 dark:bg-violet-950/20"
+            >
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <span class="odv-eyebrow">Akıllı Tarif Mühendisliği</span>
+                  <h3 class="text-sm font-extrabold">
+                    Malzemeleri Seçin → 1 Porsiyon Makro ve Alerjenlerini Otomatik Topla
+                  </h3>
+                </div>
+                <label class="flex items-center gap-2 text-xs font-bold">
+                  <span>Tarif Kaç Porsiyon Çıkıyor?</span>
+                  <input
+                    type="number"
+                    min="1"
+                    max="20"
+                    class="odv-input !w-16 !py-1 text-center text-xs tabular"
+                    [value]="recipeServings()"
+                    (input)="recipeServings.set(+$any($event.target).value || 1)"
+                  />
+                </label>
+              </div>
+
+              <div class="flex flex-wrap items-center gap-2">
+                <select
+                  class="odv-input flex-1 !py-1.5 text-xs"
+                  aria-label="Tarife eklenecek malzeme"
+                  [value]="selectedIngredientId()"
+                  (change)="selectedIngredientId.set($any($event.target).value)"
+                >
+                  @for (f of store.foods(); track f.id) {
+                    <option [value]="f.id">
+                      {{ f.name }} ({{ f.unit }} · {{ f.grams }}g · {{ f.kcal }} kcal)
+                    </option>
+                  }
+                </select>
+                <input
+                  type="number"
+                  step="0.5"
+                  min="0.5"
+                  max="20"
+                  aria-label="Malzeme porsiyon adedi"
+                  class="odv-input !w-20 !py-1.5 text-center text-xs tabular"
+                  [value]="selectedIngredientAmount()"
+                  (input)="selectedIngredientAmount.set(+$any($event.target).value || 1)"
+                />
+                <button
+                  type="button"
+                  class="odv-btn-soft !min-h-8 !px-3 text-xs font-bold"
+                  (click)="addRecipeIngredient()"
+                >
+                  <span class="material-symbols-rounded !text-base" aria-hidden="true">add</span>
+                  Malzeme Ekle
+                </button>
+              </div>
+
+              @if (recipeIngredients().length) {
+                <ul class="divide-y divide-violet-200/50 rounded-xl bg-white p-3 text-xs dark:divide-slate-800 dark:bg-slate-900">
+                  @for (ing of recipeIngredients(); track $index; let idx = $index) {
+                    <li class="flex items-center justify-between py-1.5">
+                      <span>
+                        <strong>{{ ing.food.name }}</strong> · {{ ing.amount }} × {{ ing.food.unit }}
+                        ({{ ing.food.grams * ing.amount | number: '1.0-0' }}g)
+                      </span>
+                      <span class="flex items-center gap-2">
+                        <strong class="tabular text-violet-600"
+                          >{{ ing.food.kcal * ing.amount | number: '1.0-0' }} kcal</strong
+                        >
+                        <button
+                          type="button"
+                          class="text-rose-500 hover:text-rose-700"
+                          (click)="removeRecipeIngredient(idx)"
+                          [attr.aria-label]="ing.food.name + ' malzemesini çıkar'"
+                        >
+                          <span class="material-symbols-rounded !text-sm">delete</span>
+                        </button>
+                      </span>
+                    </li>
+                  }
+                </ul>
+                <div class="flex flex-wrap items-center justify-between gap-2 pt-1 text-xs">
+                  <span class="font-semibold text-slate-600 dark:text-slate-300">
+                    1 Porsiyon Özeti ({{ recipePerServing().grams }}g):
+                    <strong class="text-violet-700 dark:text-violet-300"
+                      >{{ recipePerServing().kcal }} kcal</strong
+                    >
+                    · P: {{ recipePerServing().proteinG }}g · K: {{ recipePerServing().carbG }}g · Y:
+                    {{ recipePerServing().fatG }}g · Lif: {{ recipePerServing().fiberG }}g
+                  </span>
+                  <button
+                    type="button"
+                    class="odv-btn-primary !min-h-8 !px-3 text-xs"
+                    (click)="applyRecipeToDraft()"
+                  >
+                    1 Porsiyon Değerlerini Forma Aktar
+                  </button>
+                </div>
+              }
+            </div>
+          }
 
           <form (ngSubmit)="saveFood()" class="mt-4 space-y-4">
             <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -627,6 +743,40 @@ export class FoodsPage {
   readonly editorOpen = signal(false);
   readonly editorError = signal('');
   readonly draft = signal<FoodDraft>(emptyDraft());
+  readonly recipeBuilderOpen = signal(false);
+  readonly recipeServings = signal(2);
+  readonly selectedIngredientId = signal('f-egg');
+  readonly selectedIngredientAmount = signal(1);
+  readonly recipeIngredients = signal<{ food: FoodItem; amount: number }[]>([]);
+
+  readonly recipePerServing = computed(() => {
+    const list = this.recipeIngredients();
+    const servings = Math.max(1, this.recipeServings());
+    const totals = list.reduce(
+      (acc, cur) => ({
+        grams: acc.grams + cur.food.grams * cur.amount,
+        proteinG: acc.proteinG + cur.food.proteinG * cur.amount,
+        carbG: acc.carbG + cur.food.carbG * cur.amount,
+        fatG: acc.fatG + cur.food.fatG * cur.amount,
+        fiberG: acc.fiberG + cur.food.fiberG * cur.amount,
+      }),
+      { grams: 0, proteinG: 0, carbG: 0, fatG: 0, fiberG: 0 },
+    );
+    const proteinG = round1(totals.proteinG / servings);
+    const carbG = round1(totals.carbG / servings);
+    const fatG = round1(totals.fatG / servings);
+    const fiberG = round1(totals.fiberG / servings);
+    const allergies = Array.from(new Set(list.flatMap((i) => i.food.allergens)));
+    return {
+      grams: Math.max(1, Math.round(totals.grams / servings)),
+      proteinG,
+      carbG,
+      fatG,
+      fiberG,
+      kcal: atwaterKcal(proteinG, carbG, fatG),
+      allergens: allergies,
+    };
+  });
 
   readonly customCount = computed(() => this.store.foods().filter((f) => f.isCustom).length);
   readonly cookedDishCount = computed(
@@ -778,6 +928,35 @@ export class FoodsPage {
   per100g(value: number, grams: number): number {
     if (grams <= 0) return 0;
     return round1((value * 100) / grams);
+  }
+
+  addRecipeIngredient(): void {
+    const food =
+      this.store.foods().find((f) => f.id === this.selectedIngredientId()) ??
+      this.store.foods()[0];
+    if (!food) return;
+    const amount = Math.max(0.25, this.selectedIngredientAmount());
+    this.recipeIngredients.update((list) => [...list, { food, amount }]);
+  }
+
+  removeRecipeIngredient(index: number): void {
+    this.recipeIngredients.update((list) => list.filter((_, i) => i !== index));
+  }
+
+  applyRecipeToDraft(): void {
+    const p = this.recipePerServing();
+    this.patchDraft({
+      grams: p.grams,
+      proteinG: p.proteinG,
+      carbG: p.carbG,
+      fatG: p.fatG,
+      fiberG: p.fiberG,
+      kcal: p.kcal,
+      allergens: p.allergens,
+      autoKcal: true,
+    });
+    this.recipeBuilderOpen.set(false);
+    this.notify.success('Tarifin 1 porsiyon besin değerleri ve alerjenleri forma aktarıldı.');
   }
 }
 

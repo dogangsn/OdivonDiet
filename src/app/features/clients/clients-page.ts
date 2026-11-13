@@ -161,6 +161,14 @@ import { QuickActions } from '../forms/quick-actions';
                         >{{ v.client.allergies.length }}</span
                       >
                     }
+                    <span
+                      class="ms-auto inline-flex items-center gap-1 font-semibold"
+                      [class.text-amber-600]="completedSessionCount(v.client.id) >= 3"
+                      [class.text-violet-600]="completedSessionCount(v.client.id) < 3"
+                    >
+                      <span class="material-symbols-rounded !text-base">redeem</span>
+                      {{ completedSessionCount(v.client.id) }}/4 Seans
+                    </span>
                   </div>
                 </div>
               </button>
@@ -219,6 +227,13 @@ export class ClientsPage {
 
   countFor(status: ClientStatus): number {
     return this.store.clients().filter((c) => c.status === status).length;
+  }
+
+  completedSessionCount(clientId: string): number {
+    const done = this.store
+      .consultations()
+      .filter((c) => c.clientId === clientId && c.status === 'done').length;
+    return (done % 4) + 1;
   }
 
   bmiTone = toneClass;

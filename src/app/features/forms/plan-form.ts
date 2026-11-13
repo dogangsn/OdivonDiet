@@ -389,12 +389,21 @@ const MEAL_LAYOUTS: Record<number, ReadonlyArray<[string, string, number]>> = {
           @if (allergenConflicts().length) {
             <div
               role="alert"
-              class="mt-3 flex items-start gap-2 rounded-lg bg-rose-100 px-3 py-2 text-xs font-semibold text-rose-800 dark:bg-rose-950/70 dark:text-rose-200"
+              class="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-rose-100 px-3 py-2 text-xs font-semibold text-rose-800 dark:bg-rose-950/70 dark:text-rose-200"
             >
-              <span class="material-symbols-rounded !text-base">gpp_maybe</span>
-              <span>
-                Danışan alerjen çakışması tespit edildi: {{ allergenConflicts().join(' · ') }}
+              <span class="flex items-center gap-2">
+                <span class="material-symbols-rounded !text-base">gpp_maybe</span>
+                <span>
+                  Danışan alerjen / Gİ çakışması tespit edildi: {{ allergenConflicts().join(' · ') }}
+                </span>
               </span>
+              <button
+                type="button"
+                class="rounded-lg bg-rose-700 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-rose-800"
+                (click)="autoFixAllergenConflicts()"
+              >
+                Güvenli Muadiliyle Otomatik Değiştir
+              </button>
             </div>
           }
         </div>
@@ -1022,6 +1031,48 @@ export class PlanForm {
     this.quickFood.update((cur) => ({ ...cur, name: '' }));
     this.quickFoodOpen.set(false);
     this.notify.success('Yeni besin kütüphaneye eklendi', `${created.name} · ${created.kcal} kcal`);
+  }
+
+  autoFixAllergenConflicts(): void {
+    const view = this.selectedClientView();
+    if (!view) return;
+    const clientAllergies = view.client.allergies.map((a) => a.toLocaleLowerCase('tr'));
+    const allFoods = this.store.foods();
+    const foodsById = new Map(allFoods.map((f) => [f.id, f]));
+
+    this.mealItemsBySlot.update((slots) => {
+      const next: Record<number, MealFoodItem[]> = {};
+      for (const [slotKey, items] of Object.entries(slots)) {
+        next[Number(slotKey)] = items.map((item) => {
+          const food = foodsById.get(item.foodId);
+          if (!food) return item;
+          const hasConflict = food.allergens.some((alg) =>
+            clientAllergies.some(
+              (ca) =>
+                ca.includes(alg.toLocaleLowerCase('tr')) ||
+                alg.toLocaleLowerCase('tr').includes(ca),
+            ),
+          );
+          if (!hasConflict) return item;
+          const safeReplacement =
+            allFoods.find(
+              (cand) =>
+                cand.exchange === food.exchange &&
+                cand.id !== food.id &&
+                !cand.allergens.some((alg) =>
+                  clientAllergies.some(
+                    (ca) =>
+                      ca.includes(alg.toLocaleLowerCase('tr')) ||
+                      alg.toLocaleLowerCase('tr').includes(ca),
+                  ),
+                ),
+            ) ?? allFoods.find((cand) => cand.allergens.length === 0);
+          return safeReplacement ? scaleFoodItem(safeReplacement, item.portions) : item;
+        });
+      }
+      return next;
+    });
+    this.notify.success('Alerjen içeren besinler güvenli eşdeğerleriyle değiştirildi.');
   }
 
   save(): void {

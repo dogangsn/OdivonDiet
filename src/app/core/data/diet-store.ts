@@ -1,4 +1,6 @@
+import { HttpClient } from '@angular/common/http';
 import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
+import { environment } from '../../../environments/environment';
 import {
   ageFrom,
   bmi,
@@ -105,8 +107,11 @@ export const MEASUREMENT_OVERDUE_DAYS = 14;
 @Injectable({ providedIn: 'root' })
 export class DietStore {
   private readonly auth = inject(AuthStore);
+  private readonly http = inject(HttpClient, { optional: true });
   readonly workspace = computed(() => workspaceKeyFor(this.auth.session()));
+  readonly syncStatus = signal<'idle' | 'syncing' | 'synced' | 'offline'>('idle');
   private loadedWorkspace: string | null = null;
+  private hydratingFromRemote = false;
   readonly clients = signal<Client[]>([]);
   readonly measurements = signal<Measurement[]>([]);
   readonly plans = signal<MealPlan[]>([]);
@@ -140,7 +145,12 @@ export class DietStore {
         glp1Profiles: this.glp1Profiles(),
       };
       const key = this.loadedWorkspace;
-      if (key) saveWorkspacePart(key, 'diet', data);
+      if (key) {
+        saveWorkspacePart(key, 'diet', data);
+        if (!this.hydratingFromRemote) {
+          this.pushRemoteWorkspace(key, data);
+        }
+      }
     });
   }
 
@@ -152,6 +162,11 @@ export class DietStore {
       key === SAMPLE_WORKSPACE
         ? createSeed(new Date())
         : (loadWorkspacePart<DietData>(key, 'diet') ?? emptyDietData());
+    this.applyDietData(data);
+    this.pullRemoteWorkspace(key);
+  }
+
+  private applyDietData(data: DietData): void {
     const empty = emptyDietData();
     this.clients.set(data.clients ?? empty.clients);
     this.measurements.set(data.measurements ?? empty.measurements);
@@ -163,6 +178,38 @@ export class DietStore {
     this.medications.set(data.medications ?? []);
     this.supplements.set(data.supplements ?? []);
     this.glp1Profiles.set(data.glp1Profiles ?? []);
+  }
+
+  private pullRemoteWorkspace(key: string): void {
+    const session = untracked(this.auth.session);
+    if (!this.http || !session || session.demo || key === SAMPLE_WORKSPACE) return;
+    this.syncStatus.set('syncing');
+    this.http.get<DietData>(`${environment.apiBaseUrl}/diet/workspace`).subscribe({
+      next: (remote) => {
+        if (!remote || this.loadedWorkspace !== key) return;
+        this.hydratingFromRemote = true;
+        try {
+          this.applyDietData(remote);
+          saveWorkspacePart(key, 'diet', remote);
+          this.syncStatus.set('synced');
+        } finally {
+          this.hydratingFromRemote = false;
+        }
+      },
+      error: () => {
+        this.syncStatus.set('offline');
+      },
+    });
+  }
+
+  private pushRemoteWorkspace(key: string, data: DietData): void {
+    const session = untracked(this.auth.session);
+    if (!this.http || !session || session.demo || key === SAMPLE_WORKSPACE) return;
+    this.syncStatus.set('syncing');
+    this.http.put(`${environment.apiBaseUrl}/diet/workspace`, data).subscribe({
+      next: () => this.syncStatus.set('synced'),
+      error: () => this.syncStatus.set('offline'),
+    });
   }
 
   readonly clientViews = computed<ClientView[]>(() => {

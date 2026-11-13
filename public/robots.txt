@@ -1,0 +1,24 @@
+User-agent: *
+Allow: /
+Allow: /tanitim
+Allow: /login
+Allow: /register
+Allow: /portal/login
+Disallow: /overview
+Disallow: /clients
+Disallow: /plans
+Disallow: /foods
+Disallow: /clinical-lab
+Disallow: /measurements
+Disallow: /consultations
+Disallow: /reports
+Disallow: /messages
+Disallow: /requests
+Disallow: /tasks
+Disallow: /activity
+Disallow: /settings
+Disallow: /billing
+Disallow: /portal
+
+Sitemap: https://diet.odivon.com/sitemap.xml
+

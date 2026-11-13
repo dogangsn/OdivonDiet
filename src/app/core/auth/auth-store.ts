@@ -340,6 +340,18 @@ export class AuthStore {
     this.session.set(null);
   }
 
+  /** Updates the signed-in dietitian's clinic/profile metadata and persists it to the session. */
+  updateProfile(
+    patch: Partial<Pick<AppSession, 'name' | 'practice' | 'specialty' | 'licenseNo' | 'workspaceMode'>>,
+  ): void {
+    const current = this.session();
+    if (!current) return;
+    this.persist({
+      ...current,
+      ...patch,
+    });
+  }
+
   /** Loaded on demand so the data stores and demo seed stay out of the login bundle. */
   private async stores() {
     const [{ DietStore }, { PortalStore }, { findLocalMember }] = await Promise.all([

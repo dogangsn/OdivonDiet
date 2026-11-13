@@ -380,7 +380,17 @@ const AGENDA_SLOTS = [
                       }
 
                       @if (item.status === 'scheduled') {
-                        <div class="mt-3 flex items-center justify-end gap-1.5 border-t border-black/5 pt-2 dark:border-white/10">
+                        <div class="mt-3 flex flex-wrap items-center justify-end gap-1.5 border-t border-black/5 pt-2 dark:border-white/10">
+                          <button
+                            type="button"
+                            class="odv-btn-ghost !min-h-7 !px-2 text-xs text-emerald-700 dark:text-emerald-300"
+                            (click)="sendWhatsAppReminder(item)"
+                          >
+                            <span class="material-symbols-rounded !text-sm" aria-hidden="true"
+                              >chat</span
+                            >
+                            WhatsApp Hatırlat
+                          </button>
                           <button
                             type="button"
                             class="odv-btn-ghost !min-h-7 !px-2.5 text-xs"
@@ -599,6 +609,16 @@ const AGENDA_SLOTS = [
                   <div class="flex shrink-0 items-center gap-2 sm:justify-end">
                     @switch (item.status) {
                       @case ('scheduled') {
+                        <button
+                          type="button"
+                          class="odv-btn-ghost !min-h-9 text-xs text-emerald-700 dark:text-emerald-300"
+                          (click)="sendWhatsAppReminder(item)"
+                        >
+                          <span class="material-symbols-rounded !text-base" aria-hidden="true"
+                            >chat</span
+                          >
+                          WhatsApp Hatırlat
+                        </button>
                         <button
                           type="button"
                           class="odv-btn-ghost !min-h-9 text-xs"
@@ -950,5 +970,20 @@ export class ConsultationsPage {
     if (!confirmed) return;
     this.store.cancelConsultation(item.id);
     this.notify.success('Görüşme iptal edildi');
+  }
+
+  sendWhatsAppReminder(item: Consultation): void {
+    const clientName = this.store.clientName(item.clientId);
+    const dt = new Date(item.at);
+    const dateStr = dt.toLocaleDateString('tr-TR', {
+      day: 'numeric',
+      month: 'long',
+      weekday: 'long',
+    });
+    const timeStr = dt.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+    const channelLabel = this.labels[item.channel];
+    const message = `Merhaba ${clientName}, OdivonDiet kliniğimizdeki ${dateStr} saat ${timeStr} (${channelLabel}) kontrol seansınızı hatırlatmak isteriz. Seans öncesi güncel tartı ve su takibinizi danışan portalınızdan girebilirsiniz. Sağlıklı günler dileriz!`;
+    void globalThis.navigator?.clipboard?.writeText(message);
+    this.notify.success(`${clientName} için WhatsApp randevu hatırlatma mesajı panoya kopyalandı.`);
   }
 }

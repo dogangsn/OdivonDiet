@@ -1,4 +1,7 @@
+import { HttpClient } from '@angular/common/http';
 import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
+import { environment } from '../../../environments/environment';
+import { AuthStore } from '../auth/auth-store';
 import { partitionAttachments } from '../../domain/attachment-rules';
 import { isoDate } from '../../domain/diet-calc';
 import { Client } from '../../domain/diet.models';
@@ -84,7 +87,10 @@ export interface NewRequest {
 @Injectable({ providedIn: 'root' })
 export class PortalStore {
   private readonly diet = inject(DietStore);
+  private readonly auth = inject(AuthStore);
+  private readonly http = inject(HttpClient, { optional: true });
   private loadedWorkspace: string | null = null;
+  private hydratingFromRemote = false;
   readonly access = signal<PortalAccess[]>([]);
   readonly messages = signal<Message[]>([]);
   readonly tasks = signal<CareTask[]>([]);
@@ -106,7 +112,12 @@ export class PortalStore {
         readMarkers: this.readMarkers(),
       };
       const key = this.loadedWorkspace;
-      if (key) saveWorkspacePart(key, 'portal', data);
+      if (key) {
+        saveWorkspacePart(key, 'portal', data);
+        if (!this.hydratingFromRemote) {
+          this.pushRemotePortal(key, data);
+        }
+      }
     });
   }
 
@@ -118,12 +129,47 @@ export class PortalStore {
       key === SAMPLE_WORKSPACE
         ? createPortalSeed(new Date())
         : (loadWorkspacePart<PortalData>(key, 'portal') ?? emptyPortalData());
+    this.applyPortalData(data);
+    this.pullRemotePortal(key);
+  }
+
+  private applyPortalData(data: PortalData): void {
     const empty = emptyPortalData();
     this.access.set(data.access ?? empty.access);
     this.messages.set(data.messages ?? empty.messages);
     this.tasks.set(data.tasks ?? empty.tasks);
     this.requests.set(data.requests ?? empty.requests);
     this.readMarkers.set(data.readMarkers ?? empty.readMarkers);
+  }
+
+  private pullRemotePortal(key: string): void {
+    const session = untracked(this.auth.session);
+    if (!this.http || !session || session.demo || key === SAMPLE_WORKSPACE) return;
+    this.http.get<PortalData>(`${environment.apiBaseUrl}/diet/portal/workspace`).subscribe({
+      next: (remote) => {
+        if (!remote || this.loadedWorkspace !== key) return;
+        this.hydratingFromRemote = true;
+        try {
+          this.applyPortalData(remote);
+          saveWorkspacePart(key, 'portal', remote);
+        } finally {
+          this.hydratingFromRemote = false;
+        }
+      },
+      error: () => {
+        // Offline / local fallback remains active
+      },
+    });
+  }
+
+  private pushRemotePortal(key: string, data: PortalData): void {
+    const session = untracked(this.auth.session);
+    if (!this.http || !session || session.demo || key === SAMPLE_WORKSPACE) return;
+    this.http.put(`${environment.apiBaseUrl}/diet/portal/workspace`, data).subscribe({
+      error: () => {
+        // Local storage already saved
+      },
+    });
   }
 
   /** Every client the dietitian can chat with, newest conversation first. */
@@ -193,11 +239,26 @@ export class PortalStore {
     };
     this.upsertAccess(next);
     this.diet.log('mail', 'primary', 'Portal daveti gönderildi', this.diet.clientName(clientId));
+    const session = untracked(this.auth.session);
+    const client = this.diet.clients().find((c) => c.id === clientId);
+    if (this.http && session && !session.demo && client?.email) {
+      this.http
+        .post(`${environment.apiBaseUrl}/diet/clients/${clientId}/portal/invite`, {
+          email: client.email,
+        })
+        .subscribe({ error: () => {} });
+    }
   }
 
   disable(clientId: string): void {
     this.upsertAccess({ ...this.accessFor(clientId), status: 'disabled' });
     this.diet.log('block', 'warning', 'Portal erişimi kapatıldı', this.diet.clientName(clientId));
+    const session = untracked(this.auth.session);
+    if (this.http && session && !session.demo) {
+      this.http
+        .post(`${environment.apiBaseUrl}/diet/clients/${clientId}/portal/disable`, {})
+        .subscribe({ error: () => {} });
+    }
   }
 
   markActivated(clientId: string): void {
