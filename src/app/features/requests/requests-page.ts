@@ -4,6 +4,8 @@ import { Router, RouterLink } from '@angular/router';
 import { AuthStore } from '../../core/auth/auth-store';
 import { DietStore } from '../../core/data/diet-store';
 import { PortalStore } from '../../core/data/portal-store';
+import { isoDate } from '../../domain/diet-calc';
+import { CHANNEL_LABELS, ConsultationChannel } from '../../domain/diet.models';
 import {
   REQUEST_STATUS_LABELS,
   REQUEST_STATUS_TONES,
@@ -60,6 +62,12 @@ type Filter = 'active' | 'closed' | 'all';
                 <span class="flex flex-wrap items-center gap-2">
                   <strong class="text-sm">{{ r.subject }}</strong>
                   <span class="odv-badge" [class]="tone(r.status)">{{ statusLabels[r.status] }}</span>
+                  @if (r.preferredDate) {
+                    <span class="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-200">
+                      <span class="material-symbols-rounded !text-sm" aria-hidden="true">event_available</span>
+                      {{ r.preferredDate | date: 'd MMM' }} · {{ r.preferredTime || '14:00' }} · {{ channelLabels[r.preferredChannel || 'video'] }}
+                    </span>
+                  }
                 </span>
                 <span class="mt-0.5 flex flex-wrap items-center gap-x-3 text-xs text-slate-500">
                   <span class="inline-flex items-center gap-1.5"
@@ -122,10 +130,69 @@ type Filter = 'active' | 'closed' | 'all';
               <p class="mt-1 whitespace-pre-line">{{ r.response }}</p>
             </div>
           }
-          <a class="odv-btn-soft" routerLink="/messages" [queryParams]="{ client: r.clientId }">
-            <span class="material-symbols-rounded !text-base">forum</span>Sohbete git
-          </a>
+          <div class="flex flex-wrap gap-2">
+            <a class="odv-btn-soft" routerLink="/messages" [queryParams]="{ client: r.clientId }">
+              <span class="material-symbols-rounded !text-base">forum</span>Sohbete git
+            </a>
+            @if (r.type === 'appointment') {
+              <a class="odv-btn-soft" routerLink="/consultations">
+                <span class="material-symbols-rounded !text-base">calendar_month</span>Takvimi aç
+              </a>
+            }
+          </div>
         </div>
+
+        @if (r.type === 'appointment' && r.status !== 'resolved') {
+          <div class="odv-card border-emerald-200 bg-emerald-50/50 space-y-3 p-5 dark:border-emerald-900/60 dark:bg-emerald-950/20">
+            <div class="flex items-center justify-between gap-2">
+              <div>
+                <span class="odv-eyebrow text-emerald-700 dark:text-emerald-300">Tek Tıkla Randevu Onayı</span>
+                <h4 class="text-sm font-extrabold text-slate-900 dark:text-white">Onayla ve klinik takvimine işle</h4>
+              </div>
+              <span class="material-symbols-rounded text-emerald-600 dark:text-emerald-400" aria-hidden="true">event_available</span>
+            </div>
+            <div class="grid gap-3 sm:grid-cols-3">
+              <label class="block">
+                <span class="odv-label">Tarih</span>
+                <input
+                  type="date"
+                  class="odv-input !py-1.5 text-xs"
+                  [value]="scheduleDate()"
+                  (input)="scheduleDate.set($any($event.target).value)"
+                />
+              </label>
+              <label class="block">
+                <span class="odv-label">Saat</span>
+                <input
+                  type="time"
+                  class="odv-input !py-1.5 text-xs"
+                  [value]="scheduleTime()"
+                  (input)="scheduleTime.set($any($event.target).value)"
+                />
+              </label>
+              <label class="block">
+                <span class="odv-label">Görüşme kanalı</span>
+                <select
+                  class="odv-input !py-1.5 text-xs"
+                  [value]="scheduleChannel()"
+                  (change)="scheduleChannel.set($any($event.target).value)"
+                >
+                  <option value="video">Online Görüntülü</option>
+                  <option value="clinic">Yüz Yüze Klinik</option>
+                  <option value="phone">Telefon</option>
+                </select>
+              </label>
+            </div>
+            <button
+              type="button"
+              class="odv-btn-primary w-full justify-center !bg-emerald-600 hover:!bg-emerald-700"
+              (click)="approveAppointment()"
+            >
+              <span class="material-symbols-rounded !text-lg">event_available</span>
+              Randevuyu Onayla ve Takvime Ekle
+            </button>
+          </div>
+        }
 
         <div class="odv-card space-y-4 p-5">
           <fieldset>
@@ -163,10 +230,14 @@ export class RequestsPage {
   readonly typeIcons = REQUEST_TYPE_ICONS;
   readonly typeLabels = REQUEST_TYPE_LABELS;
   readonly statusLabels = REQUEST_STATUS_LABELS;
+  readonly channelLabels = CHANNEL_LABELS;
   readonly statuses: RequestStatus[] = ['in_progress', 'resolved', 'rejected'];
   readonly filter = signal<Filter>('active');
   readonly status = signal<RequestStatus>('resolved');
   readonly response = signal('');
+  readonly scheduleDate = signal(isoDate(new Date()));
+  readonly scheduleTime = signal('14:00');
+  readonly scheduleChannel = signal<ConsultationChannel>('video');
 
   readonly activeCount = computed(
     () => this.portal.requests().filter((r) => r.status === 'open' || r.status === 'in_progress').length,
@@ -193,6 +264,13 @@ export class RequestsPage {
       untracked(() => {
         this.response.set('');
         this.status.set(r?.status === 'open' ? 'in_progress' : (r?.status ?? 'resolved'));
+        if (r?.type === 'appointment') {
+          const tomorrow = new Date();
+          tomorrow.setDate(tomorrow.getDate() + 1);
+          this.scheduleDate.set(r.preferredDate || isoDate(tomorrow));
+          this.scheduleTime.set(r.preferredTime || '14:00');
+          this.scheduleChannel.set(r.preferredChannel || 'video');
+        }
       });
     });
   }
@@ -215,5 +293,27 @@ export class RequestsPage {
     this.portal.respondToRequest(r.id, this.status(), this.response().trim(), this.auth.session()?.name ?? 'Diyetisyen');
     this.notify.success('Yanıt gönderildi', 'Danışan portalda bilgilendirildi.');
     this.openRequest(null);
+  }
+
+  approveAppointment(): void {
+    const r = this.selected();
+    if (!r) return;
+    const created = this.portal.approveAppointmentRequest(
+      r.id,
+      this.auth.session()?.name ?? 'Diyetisyen',
+      {
+        date: this.scheduleDate(),
+        time: this.scheduleTime(),
+        channel: this.scheduleChannel(),
+        note: this.response().trim() || undefined,
+      },
+    );
+    if (created) {
+      this.notify.success(
+        'Randevu takvime eklendi',
+        `${this.diet.clientName(r.clientId)} için ${this.scheduleDate()} ${this.scheduleTime()} randevusu onaylandı.`,
+      );
+      this.openRequest(null);
+    }
   }
 }

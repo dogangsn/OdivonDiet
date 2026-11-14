@@ -1,4 +1,4 @@
-import { Tone } from './diet.models';
+import { ConsultationChannel, Tone } from './diet.models';
 
 /** Who is signed in. Dietitians use the workspace, members (clients) use the portal. */
 export type UserRole = 'dietitian' | 'member';
@@ -73,6 +73,10 @@ export interface MemberRequest {
   readonly updatedAt: string;
   readonly response: string;
   readonly attachments: readonly Attachment[];
+  /** Optional structured slot requested when `type === 'appointment'`. */
+  readonly preferredDate?: string;
+  readonly preferredTime?: string;
+  readonly preferredChannel?: ConsultationChannel;
 }
 
 export type PortalAccessStatus = 'none' | 'invited' | 'active' | 'disabled';

@@ -1,4 +1,5 @@
 import { TestBed } from '@angular/core/testing';
+import { DietStore } from './diet-store';
 import { PortalStore } from './portal-store';
 
 describe('PortalStore', () => {
@@ -74,5 +75,25 @@ describe('PortalStore', () => {
     expect(store.clientIdForLogin('zeynep@ornek.com', clients)).toBe('c-5');
     store.disable('c-5');
     expect(store.clientIdForLogin('zeynep@ornek.com', clients)).toBeUndefined();
+  });
+
+  it('approves an appointment request and creates a scheduled consultation in DietStore', () => {
+    const diet = TestBed.inject(DietStore);
+    const beforeCount = diet.consultations().length;
+    const req = store.createRequest({
+      clientId: 'c-1',
+      type: 'appointment',
+      subject: 'Randevu talebi · 20 Kas 15:00 (Online Görüntülü)',
+      detail: 'Kontrol görüşmesi',
+      preferredDate: '2026-11-20',
+      preferredTime: '15:00',
+      preferredChannel: 'video',
+    });
+
+    const result = store.approveAppointmentRequest(req.id, 'Dyt. Deniz');
+    expect(result?.dateIso).toBe('2026-11-20');
+    expect(diet.consultations().length).toBe(beforeCount + 1);
+    expect(store.request(req.id)?.status).toBe('resolved');
+    expect(store.request(req.id)?.response).toContain('15:00');
   });
 });

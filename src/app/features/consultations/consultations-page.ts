@@ -1,6 +1,8 @@
 import { DatePipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
+import { AuthStore } from '../../core/auth/auth-store';
 import { DietStore } from '../../core/data/diet-store';
+import { PortalStore } from '../../core/data/portal-store';
 import { Notify } from '../../core/notify/notify';
 import { isoDate, round1, startOfDay } from '../../domain/diet-calc';
 import {
@@ -9,6 +11,7 @@ import {
   Consultation,
   ConsultationChannel,
 } from '../../domain/diet.models';
+import { MemberRequest } from '../../domain/portal.models';
 import { Avatar } from '../../shared/ui/avatar';
 import { EmptyState } from '../../shared/ui/empty-state';
 import { KpiCard } from '../../shared/ui/kpi-card';
@@ -99,6 +102,73 @@ const AGENDA_SLOTS = [
           [hint]="selectedDateLabel()"
         />
       </section>
+
+      <!-- Danışanlardan Gelen Randevu Talepleri -->
+      @if (openAppointmentRequests().length > 0) {
+        <section
+          aria-label="Bekleyen randevu talepleri"
+          class="odv-card border-amber-200 bg-amber-50/50 p-4 space-y-3 dark:border-amber-900/60 dark:bg-amber-950/20"
+        >
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="flex items-center gap-2.5">
+              <span class="grid size-9 place-items-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-900/60 dark:text-amber-300">
+                <span class="material-symbols-rounded !text-lg" aria-hidden="true">notification_important</span>
+              </span>
+              <div>
+                <span class="odv-eyebrow text-amber-700 dark:text-amber-300">Danışan Portalı Randevu Talepleri</span>
+                <h2 class="text-sm font-extrabold text-slate-900 dark:text-white">
+                  Onay bekleyen {{ openAppointmentRequests().length }} randevu talebi var
+                </h2>
+              </div>
+            </div>
+            <a href="/requests" class="odv-btn-ghost !py-1.5 !text-xs">
+              Tüm talepleri gör
+            </a>
+          </div>
+
+          <div class="grid gap-3 md:grid-cols-2">
+            @for (req of openAppointmentRequests(); track req.id) {
+              <div class="flex flex-col justify-between gap-3 rounded-2xl border border-amber-200/80 bg-white p-3.5 shadow-xs sm:flex-row sm:items-center dark:border-slate-800 dark:bg-slate-900">
+                <div class="min-w-0 space-y-1">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <app-avatar [name]="store.clientName(req.clientId)" size="sm" />
+                    <strong class="text-sm">{{ store.clientName(req.clientId) }}</strong>
+                    @if (req.preferredDate) {
+                      <span class="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-200">
+                        <span class="material-symbols-rounded !text-xs" aria-hidden="true">schedule</span>
+                        {{ req.preferredDate | date: 'd MMM' }} · {{ req.preferredTime || '14:00' }} · {{ labels[req.preferredChannel || 'video'] }}
+                      </span>
+                    }
+                  </div>
+                  <p class="truncate text-xs font-bold text-slate-800 dark:text-slate-200">{{ req.subject }}</p>
+                  @if (req.detail) {
+                    <p class="line-clamp-1 text-xs text-slate-500">{{ req.detail }}</p>
+                  }
+                </div>
+                <div class="flex shrink-0 flex-wrap items-center gap-1.5">
+                  @if (req.preferredDate) {
+                    <button
+                      type="button"
+                      class="odv-btn-ghost !px-2.5 !py-1.5 !text-xs"
+                      (click)="previewRequestedDay(req)"
+                    >
+                      Günü Gör
+                    </button>
+                  }
+                  <button
+                    type="button"
+                    class="odv-btn-primary !bg-emerald-600 !px-3 !py-1.5 !text-xs hover:!bg-emerald-700"
+                    (click)="approveRequestOnCalendar(req)"
+                  >
+                    <span class="material-symbols-rounded !text-sm" aria-hidden="true">event_available</span>
+                    Onayla & Ekle
+                  </button>
+                </div>
+              </div>
+            }
+          </div>
+        </section>
+      }
 
       <!-- Takvim Kontrol & Görünüm Araç Çubuğu -->
       <section
@@ -680,8 +750,15 @@ const AGENDA_SLOTS = [
 })
 export class ConsultationsPage {
   readonly store = inject(DietStore);
+  readonly portal = inject(PortalStore);
+  private readonly auth = inject(AuthStore);
   readonly qa = inject(QuickActions);
   private readonly notify = inject(Notify);
+  readonly openAppointmentRequests = computed(() =>
+    this.portal
+      .requests()
+      .filter((r) => r.type === 'appointment' && (r.status === 'open' || r.status === 'in_progress')),
+  );
   readonly labels = CHANNEL_LABELS;
   readonly icons = CHANNEL_ICONS;
   readonly weekdayHeaders = WEEKDAY_HEADERS;
@@ -916,6 +993,28 @@ export class ConsultationsPage {
   openScheduleAt(dateIso: string, time = '10:00'): void {
     this.selectedDate.set(dateIso);
     this.qa.open('consultation', undefined, undefined, dateIso, time);
+  }
+
+  previewRequestedDay(req: MemberRequest): void {
+    if (!req.preferredDate) return;
+    this.selectedDate.set(req.preferredDate);
+    this.cursorDate.set(startOfDay(new Date(`${req.preferredDate}T12:00:00`)));
+  }
+
+  approveRequestOnCalendar(req: MemberRequest): void {
+    const created = this.portal.approveAppointmentRequest(
+      req.id,
+      this.auth.session()?.name ?? 'Diyetisyen',
+    );
+    if (created) {
+      const dateIso = isoDate(new Date(created.at));
+      this.selectedDate.set(dateIso);
+      this.cursorDate.set(startOfDay(new Date(created.at)));
+      this.notify.success(
+        'Randevu takvime işlendi',
+        `${this.store.clientName(req.clientId)} randevusu onaylandı ve danışana bildirildi.`,
+      );
+    }
   }
 
   consultationsInHour(dayIso: string, hourLabel: string): Consultation[] {

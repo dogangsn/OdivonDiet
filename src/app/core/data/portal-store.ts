@@ -4,7 +4,7 @@ import { environment } from '../../../environments/environment';
 import { AuthStore } from '../auth/auth-store';
 import { partitionAttachments } from '../../domain/attachment-rules';
 import { isoDate } from '../../domain/diet-calc';
-import { Client } from '../../domain/diet.models';
+import { CHANNEL_LABELS, Client, ConsultationChannel } from '../../domain/diet.models';
 import {
   Attachment,
   CareTask,
@@ -74,6 +74,9 @@ export interface NewRequest {
   readonly type: RequestType;
   readonly subject: string;
   readonly detail: string;
+  readonly preferredDate?: string;
+  readonly preferredTime?: string;
+  readonly preferredChannel?: ConsultationChannel;
 }
 
 /**
@@ -490,6 +493,59 @@ export class PortalStore {
       `Talep: ${REQUEST_STATUS_LABELS[status]}`,
       `${this.diet.clientName(request.clientId)} · ${request.subject}`,
     );
+  }
+
+  /**
+   * 1-click appointment request approval: creates a scheduled Consultation in DietStore
+   * at the requested (or overridden) date/time/channel and resolves the MemberRequest.
+   */
+  approveAppointmentRequest(
+    requestId: string,
+    dietitianName: string,
+    override?: {
+      date?: string;
+      time?: string;
+      channel?: ConsultationChannel;
+      note?: string;
+    },
+  ): { at: string; dateIso: string } | null {
+    const request = this.request(requestId);
+    if (!request) return null;
+
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const dateIso = override?.date || request.preferredDate || isoDate(tomorrow);
+    const timeStr = override?.time || request.preferredTime || '14:00';
+    const channel: ConsultationChannel =
+      override?.channel || request.preferredChannel || 'video';
+
+    const [hhStr, mmStr] = timeStr.split(':');
+    const dt = new Date(`${dateIso}T12:00:00`);
+    dt.setHours(Number(hhStr) || 14, Number(mmStr) || 0, 0, 0);
+    const at = dt.toISOString();
+
+    this.diet.addConsultation({
+      clientId: request.clientId,
+      at,
+      channel,
+      status: 'scheduled',
+      adherence: null,
+      notes: request.detail ? `Danışan talebi: ${request.detail}` : '',
+      nextAction: request.subject || 'Kontrol seansı',
+    });
+
+    const formattedDate = dt.toLocaleDateString('tr-TR', {
+      day: 'numeric',
+      month: 'long',
+      weekday: 'long',
+    });
+    const customNote = override?.note?.trim();
+    const autoReply =
+      customNote ||
+      `Randevu talebiniz onaylandı ve takvime işlendi: ${formattedDate} saat ${timeStr} (${CHANNEL_LABELS[channel]}).`;
+
+    this.respondToRequest(requestId, 'resolved', autoReply, dietitianName);
+    return { at, dateIso };
   }
 
   private push(message: Omit<Message, 'id' | 'at'>): Message {

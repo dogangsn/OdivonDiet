@@ -1,6 +1,6 @@
 import { Injectable, computed, inject } from '@angular/core';
 import { isoDate } from '../../domain/diet-calc';
-import { Consultation, MealPlan } from '../../domain/diet.models';
+import { Consultation, ConsultationChannel, MealPlan } from '../../domain/diet.models';
 import { RequestType } from '../../domain/portal.models';
 import { AuthStore } from '../auth/auth-store';
 import { DietStore } from './diet-store';
@@ -99,9 +99,62 @@ export class MemberPortal {
     this.portal.completeTask(taskId, note, files);
   }
 
-  createRequest(type: RequestType, subject: string, detail: string, files: readonly File[] = []) {
+  createRequest(
+    type: RequestType,
+    subject: string,
+    detail: string,
+    files: readonly File[] = [],
+    appointmentSlot?: {
+      preferredDate?: string;
+      preferredTime?: string;
+      preferredChannel?: ConsultationChannel;
+    },
+  ) {
     const clientId = this.requireClient();
-    return this.portal.createRequest({ clientId, type, subject, detail }, files);
+    return this.portal.createRequest(
+      {
+        clientId,
+        type,
+        subject,
+        detail,
+        ...(type === 'appointment' && appointmentSlot ? appointmentSlot : {}),
+      },
+      files,
+    );
+  }
+
+  /**
+   * Returns standard clinic appointment slots for a given date (`YYYY-MM-DD`) and whether
+   * each slot is already booked in the dietitian's schedule (privacy-safe: no client names exposed).
+   */
+  availableSlotsForDate(dateIso: string): { time: string; busy: boolean }[] {
+    const slots = [
+      '09:00',
+      '09:30',
+      '10:00',
+      '10:30',
+      '11:00',
+      '11:30',
+      '13:30',
+      '14:00',
+      '15:00',
+      '15:30',
+      '16:00',
+      '17:00',
+    ];
+    const bookedTimes = new Set(
+      this.diet
+        .consultations()
+        .filter((c) => c.status !== 'cancelled' && isoDate(new Date(c.at)) === dateIso)
+        .map((c) => {
+          const dt = new Date(c.at);
+          return `${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`;
+        }),
+    );
+    return slots.map((time) => ({
+      time,
+      busy: bookedTimes.has(time),
+    }));
   }
 
   logWeight(weightKg: number, note: string): void {

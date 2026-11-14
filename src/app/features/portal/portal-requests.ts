@@ -1,7 +1,9 @@
 import { DatePipe } from '@angular/common';
-import { Component, effect, inject, input, signal, untracked } from '@angular/core';
+import { Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { FormField, form, maxLength, required, submit } from '@angular/forms/signals';
 import { MemberPortal } from '../../core/data/member-portal';
+import { isoDate } from '../../domain/diet-calc';
+import { CHANNEL_ICONS, CHANNEL_LABELS, ConsultationChannel } from '../../domain/diet.models';
 import {
   REQUEST_STATUS_LABELS,
   REQUEST_STATUS_TONES,
@@ -34,9 +36,14 @@ interface RequestDraft {
         description="Randevu, plan değişikliği, rapor veya sorularınızı diyetisyeninize iletin."
       >
         @if (!formOpen()) {
-          <button actions type="button" class="odv-btn-primary" (click)="openForm('question')">
-            <span class="material-symbols-rounded !text-lg">add</span>Yeni talep
-          </button>
+          <div actions class="flex flex-wrap gap-2">
+            <button type="button" class="odv-btn-soft !border-emerald-300 !bg-emerald-50 !text-emerald-900 dark:!border-emerald-800 dark:!bg-emerald-950/60 dark:!text-emerald-200" (click)="openForm('appointment')">
+              <span class="material-symbols-rounded !text-lg">calendar_add_on</span>Randevu talep et
+            </button>
+            <button type="button" class="odv-btn-primary" (click)="openForm('question')">
+              <span class="material-symbols-rounded !text-lg">add</span>Yeni talep
+            </button>
+          </div>
         }
       </app-page-header>
 
@@ -57,6 +64,114 @@ interface RequestDraft {
               }
             </div>
           </fieldset>
+
+          @if (model().type === 'appointment') {
+            <div class="rounded-2xl border border-emerald-200/80 bg-emerald-50/50 p-4 space-y-4 dark:border-emerald-900/60 dark:bg-emerald-950/20">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <span class="odv-eyebrow text-emerald-700 dark:text-emerald-300">Canlı Klinik Ajanda</span>
+                  <h3 class="text-sm font-extrabold text-slate-900 dark:text-white">Görüşme günü, müsait saat ve kanal seçin</h3>
+                </div>
+                <span class="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200">
+                  Dolu saatler otomatik filtrelenir
+                </span>
+              </div>
+
+              <!-- Görüşme Kanalı -->
+              <div>
+                <span class="odv-label">Görüşme kanalı</span>
+                <div class="mt-1 grid gap-2 sm:grid-cols-3">
+                  @for (ch of appointmentChannels; track ch) {
+                    <button
+                      type="button"
+                      class="flex items-center gap-2 rounded-xl border px-3 py-2.5 text-xs font-bold transition"
+                      [class.border-emerald-600]="preferredChannel() === ch"
+                      [class.bg-emerald-600]="preferredChannel() === ch"
+                      [class.text-white]="preferredChannel() === ch"
+                      [class.border-slate-200]="preferredChannel() !== ch"
+                      [class.bg-white]="preferredChannel() !== ch"
+                      [class.text-slate-700]="preferredChannel() !== ch"
+                      [class.dark:border-slate-700]="preferredChannel() !== ch"
+                      [class.dark:bg-slate-900]="preferredChannel() !== ch"
+                      [class.dark:text-slate-200]="preferredChannel() !== ch"
+                      (click)="selectChannel(ch)"
+                    >
+                      <span class="material-symbols-rounded !text-base" aria-hidden="true">{{ channelIcons[ch] }}</span>
+                      {{ channelLabels[ch] }}
+                    </button>
+                  }
+                </div>
+              </div>
+
+              <!-- Gün Seçimi -->
+              <div class="grid gap-3 sm:grid-cols-[1fr_200px] sm:items-end">
+                <div>
+                  <span class="odv-label">Hızlı gün seçimi</span>
+                  <div class="mt-1 flex flex-wrap gap-1.5">
+                    @for (d of quickDays(); track d.iso) {
+                      <button
+                        type="button"
+                        class="rounded-xl border px-3 py-1.5 text-xs font-bold transition"
+                        [class.border-emerald-600]="preferredDate() === d.iso"
+                        [class.bg-emerald-600]="preferredDate() === d.iso"
+                        [class.text-white]="preferredDate() === d.iso"
+                        [class.border-slate-200]="preferredDate() !== d.iso"
+                        [class.bg-white]="preferredDate() !== d.iso"
+                        [class.text-slate-700]="preferredDate() !== d.iso"
+                        [class.dark:border-slate-700]="preferredDate() !== d.iso"
+                        [class.dark:bg-slate-900]="preferredDate() !== d.iso"
+                        [class.dark:text-slate-200]="preferredDate() !== d.iso"
+                        (click)="selectDate(d.iso)"
+                      >
+                        {{ d.label }}
+                      </button>
+                    }
+                  </div>
+                </div>
+                <label class="block">
+                  <span class="odv-label">Veya takvimden seçin</span>
+                  <input
+                    type="date"
+                    class="odv-input !py-1.5 text-xs"
+                    [min]="todayIso"
+                    [value]="preferredDate()"
+                    (change)="selectDate($any($event.target).value)"
+                  />
+                </label>
+              </div>
+
+              <!-- Saat Dilimleri -->
+              <div>
+                <span class="odv-label">Müsait saat dilimleri ({{ preferredDate() | date: 'd MMMM EEEE' }})</span>
+                <div class="mt-1.5 grid grid-cols-3 gap-2 sm:grid-cols-6">
+                  @for (slot of availableSlots(); track slot.time) {
+                    <button
+                      type="button"
+                      [disabled]="slot.busy"
+                      class="flex items-center justify-center gap-1 rounded-xl border px-2.5 py-2 text-xs font-bold tabular transition disabled:cursor-not-allowed disabled:opacity-45"
+                      [class.border-emerald-600]="preferredTime() === slot.time && !slot.busy"
+                      [class.bg-emerald-600]="preferredTime() === slot.time && !slot.busy"
+                      [class.text-white]="preferredTime() === slot.time && !slot.busy"
+                      [class.border-slate-200]="preferredTime() !== slot.time || slot.busy"
+                      [class.bg-white]="preferredTime() !== slot.time && !slot.busy"
+                      [class.bg-slate-100]="slot.busy"
+                      [class.text-slate-700]="preferredTime() !== slot.time && !slot.busy"
+                      [class.text-slate-400]="slot.busy"
+                      [class.dark:border-slate-700]="preferredTime() !== slot.time || slot.busy"
+                      [class.dark:bg-slate-900]="preferredTime() !== slot.time && !slot.busy"
+                      [class.dark:text-slate-200]="preferredTime() !== slot.time && !slot.busy"
+                      (click)="selectTime(slot.time)"
+                    >
+                      <span>{{ slot.time }}</span>
+                      @if (slot.busy) {
+                        <span class="text-[10px] font-semibold">(Dolu)</span>
+                      }
+                    </button>
+                  }
+                </div>
+              </div>
+            </div>
+          }
           <label class="block">
             <span class="odv-label">Konu <b class="text-rose-500">*</b></span>
             <input class="odv-input" [formField]="f.subject" placeholder="Kısaca talebiniz" />
@@ -88,6 +203,12 @@ interface RequestDraft {
                 <div class="flex flex-wrap items-center gap-2">
                   <strong class="text-sm">{{ r.subject }}</strong>
                   <span class="odv-badge" [class]="tone(r.status)">{{ statusLabels[r.status] }}</span>
+                  @if (r.preferredDate) {
+                    <span class="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-200">
+                      <span class="material-symbols-rounded !text-sm" aria-hidden="true">event_available</span>
+                      {{ r.preferredDate | date: 'd MMM' }} · {{ r.preferredTime || '14:00' }} · {{ channelLabels[r.preferredChannel || 'video'] }}
+                    </span>
+                  }
                 </div>
                 <p class="text-xs text-slate-500">{{ typeLabels[r.type] }} · {{ r.createdAt | date: 'd MMM y, HH:mm' }}</p>
                 @if (r.detail) {
@@ -121,10 +242,36 @@ export class PortalRequests {
   readonly typeIcons = REQUEST_TYPE_ICONS;
   readonly typeLabels = REQUEST_TYPE_LABELS;
   readonly statusLabels = REQUEST_STATUS_LABELS;
+  readonly channelLabels = CHANNEL_LABELS;
+  readonly channelIcons = CHANNEL_ICONS;
+  readonly appointmentChannels: ConsultationChannel[] = ['video', 'clinic', 'phone'];
   readonly types = Object.keys(REQUEST_TYPE_LABELS) as RequestType[];
   readonly formOpen = signal(false);
   readonly files = signal<File[]>([]);
   readonly errors = signal<string[]>([]);
+  readonly todayIso = isoDate(new Date());
+  readonly preferredDate = signal<string>(this.defaultTomorrowIso());
+  readonly preferredTime = signal<string>('14:00');
+  readonly preferredChannel = signal<ConsultationChannel>('video');
+  readonly availableSlots = computed(() =>
+    this.member.availableSlotsForDate(this.preferredDate()),
+  );
+  readonly quickDays = computed(() => {
+    const fmt = new Intl.DateTimeFormat('tr-TR', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+    });
+    const list: { iso: string; label: string }[] = [];
+    const cursor = new Date();
+    for (let i = 1; i <= 7 && list.length < 5; i++) {
+      const d = new Date(cursor);
+      d.setDate(cursor.getDate() + i);
+      if (d.getDay() === 0) continue; // Pazar hariç hızlı günler
+      list.push({ iso: isoDate(d), label: fmt.format(d) });
+    }
+    return list;
+  });
   readonly model = signal<RequestDraft>({ type: 'question', subject: '', detail: '' });
   readonly f = form(this.model, (p) => {
     required(p.subject);
@@ -159,19 +306,81 @@ export class PortalRequests {
     this.f().reset();
     this.files.set([]);
     this.errors.set([]);
+    if (type === 'appointment') {
+      this.syncAppointmentSubject();
+    }
     this.formOpen.set(true);
   }
 
   setType(type: RequestType): void {
     this.model.update((m) => ({ ...m, type }));
+    if (type === 'appointment') {
+      this.syncAppointmentSubject();
+    }
+  }
+
+  selectDate(dateIso: string): void {
+    if (!dateIso) return;
+    this.preferredDate.set(dateIso);
+    const slots = this.member.availableSlotsForDate(dateIso);
+    const current = this.preferredTime();
+    if (slots.find((s) => s.time === current)?.busy) {
+      const firstFree = slots.find((s) => !s.busy);
+      if (firstFree) this.preferredTime.set(firstFree.time);
+    }
+    this.syncAppointmentSubject();
+  }
+
+  selectTime(time: string): void {
+    this.preferredTime.set(time);
+    this.syncAppointmentSubject();
+  }
+
+  selectChannel(ch: ConsultationChannel): void {
+    this.preferredChannel.set(ch);
+    this.syncAppointmentSubject();
+  }
+
+  private syncAppointmentSubject(): void {
+    const cur = this.model().subject.trim();
+    if (cur && !cur.startsWith('Randevu talebi ·')) return;
+    const dt = new Date(`${this.preferredDate()}T12:00:00`);
+    const dateLabel = dt.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' });
+    const chLabel = this.channelLabels[this.preferredChannel()];
+    const nextSubject = `Randevu talebi · ${dateLabel} ${this.preferredTime()} (${chLabel})`;
+    this.model.update((m) => ({ ...m, subject: nextSubject }));
+  }
+
+  private defaultTomorrowIso(): string {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    if (d.getDay() === 0) d.setDate(d.getDate() + 1);
+    return isoDate(d);
   }
 
   send(event: Event): void {
     event.preventDefault();
     void submit(this.f, async () => {
       const v = this.model();
-      this.member.createRequest(v.type, v.subject, v.detail, this.files());
-      this.notify.success('Talebiniz iletildi', 'Diyetisyeniniz en kısa sürede yanıtlayacak.');
+      this.member.createRequest(
+        v.type,
+        v.subject,
+        v.detail,
+        this.files(),
+        v.type === 'appointment'
+          ? {
+              preferredDate: this.preferredDate(),
+              preferredTime: this.preferredTime(),
+              preferredChannel: this.preferredChannel(),
+            }
+          : undefined,
+      );
+      this.notify.success(
+        v.type === 'appointment' ? 'Randevu talebiniz iletildi' : 'Talebiniz iletildi',
+        v.type === 'appointment'
+          ? 'Diyetisyeniniz onayladığında randevunuz takviminize eklenecek.'
+          : 'Diyetisyeniniz en kısa sürede yanıtlayacak.',
+      );
       this.formOpen.set(false);
       this.files.set([]);
     });
