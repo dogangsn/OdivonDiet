@@ -105,39 +105,47 @@ Bu dosyalar zaten framework bağımsız saf TypeScript olduğundan doğrudan pay
 
 **Offline:** TanStack Query önbelleği diske kalıcı (MMKV); ölçüm girişi ve mesaj gönderimi çevrimdışıyken kuyruğa alınır, bağlantı gelince gönderilir.
 
-## 6. Backend / veri (ön koşul)
+## 6. Backend: ortak MainAPI
 
-Bugünkü durum:
-- İş verisi `localStorage`'da; `DietApiService` ve `PORTAL_API` (`/api/v1/diet/...`) sözleşmeleri **yazılmış ama backend yok** (`mainapi.odivon.com`).
-- Cloudflare worker (`worker/index.ts`) sadece PayTR ödeme uçlarını sunuyor.
-- Abonelik durumu da `localStorage`'da.
+**Karar (14 Kasım 2026):** web ve mobil ortak MainAPI'yi kullanacak. Repo: `AhmetAkif07/OdivonMainApi`, canlı adres `https://mainapi.odivon.com/api/v1`.
 
-Mobil için gerekli minimum API (mevcut sözleşmelerle uyumlu):
-- `GET/POST/PATCH /diet/clients`, `GET /diet/clients/:id`
-- `GET/POST /diet/clients/:id/measurements`
-- `GET/POST/PATCH /diet/consultations` (tarih aralığı filtresi)
-- `GET /diet/plans?clientId=` (salt okunur yeterli)
-- `PORTAL_API.conversations / messages / markRead / tasks / requests / attachments` (zaten tanımlı)
-- `GET /diet/overview` (KPI'lar), `GET /diet/admin/summary`, `GET/POST/PATCH /diet/staff` (yönetici)
-- `GET /diet/subscription` (PayTR callback'i artık bunu sunucuda güncellemeli)
-- `POST /diet/devices` (push token kaydı), `GET/PUT /diet/notification-preferences`
+### MainAPI'nin bugünkü durumu (incelendi)
+- **NestJS 11 modüler monolit**, Cloudflare Workers üzerinde (`odivon-main-api` worker), veritabanı **Cloud Firestore**, kimlik **Firebase Auth**. Swagger `/docs`.
+- Akış: `Controller → Service → Repository → Firestore`. Kiracı (tenant) kimliği istekten alınmaz; doğrulanmış kullanıcının `users/{uid}` profilinden okunur, veriler `tenants/{tenantId}/...` altına yazılır. Yetkinin asıl kaynağı Firestore'daki profil, custom claim'ler sadece önbellek.
+- Ortak guard'lar hazır: `FirebaseAuthGuard`, `FirebaseAppCheckGuard`, `EmailVerifiedGuard`, `TenantGuard`, `ModuleGuard`, `@RequirePermission(...)`, `ClientVersionGuard` (web'deki `X-Client-Version` / 426 akışıyla aynı sözleşme).
+- `identity` modülü: `register`, `verify-email`, `me`, `change-password`, `permission-catalog`, `users` (personel ekle/düzenle). Web'in localStorage'daki personel listesi ve kayıt akışı bunlara taşınabilir.
+- `payments` modülü: paylaşılan **PayTR** sağlayıcısı + `saas-billing` (`status`, `payments`, `notices`, `subscribe`) — şu an `vet`, `gym`, `beauty` için açık.
+- `platform` modülü: uygulama içi bildirimler (`notifications/platform`), destek talepleri, sürümler.
+- **`diet` ürünü sadece kayıtlı**: `PRODUCT_MODULES` listesinde `diet` var, tek bir izin anahtarı (`dietRecords`) ve hoş geldin e-postası tanımlı; **ama hiçbir diet controller'ı / endpoint'i yok.** Web'in `DietApiService` ve `PORTAL_API`'de beklediği `/diet/...` uçları MainAPI'de karşılıksız.
+- **Push bildirim altyapısı yok** (FCM / cihaz token kaydı bulunmuyor).
 
-**Karar (14 Kasım 2026): web ve mobil ortak MainAPI'yi kullanacak** (`https://mainapi.odivon.com/api/v1`, `environment.apiBaseUrl`).
-Bu, `AGENTS.md`'deki "business data must use MainAPI" kuralıyla uyumlu. Cloudflare worker yalnızca statik web + PayTR uçlarını sunmaya devam eder;
-PayTR callback'i ödeme onaylanınca abonelik kaydını MainAPI üzerinden güncellemelidir (`PUT /diet/subscription` veya sunucudan sunucuya bir uç).
+### MainAPI'ye eklenecek `diet` modülü
+Mevcut ürün modülleri (`fgas`, `gym`) örnek alınarak `src/modules/diet/` açılır; tüm uçlar `ModuleGuard('diet')` + `@RequirePermission` ile korunur, veri `tenants/{tenantId}/diet_*` koleksiyonlarına yazılır.
 
-MainAPI tarafında netleşmesi gerekenler: teknoloji yığını ve repo, veritabanı (öneri PostgreSQL), dosya depolama (ekler için imzalı URL),
-Firebase ID token doğrulaması + custom claim'leri (`role`, `staffRole`, `clinicId`) atayan uç, push token kaydı ve bildirim gönderimi, ortamlar (test/canlı).
+| Alan | Uçlar | Kullanan |
+|---|---|---|
+| Danışanlar | `GET/POST /diet/clients`, `GET/PATCH /diet/clients/:id`, arşivle | web + mobil |
+| Ölçümler | `GET/POST /diet/clients/:id/measurements` | web + mobil |
+| Görüşmeler | `GET /diet/consultations?from&to`, `POST/PATCH /diet/consultations/:id` | web + mobil |
+| Planlar | `GET /diet/plans?clientId=`, `POST/PATCH /diet/plans/:id` | web (yazma), mobil (okuma) |
+| Besinler, klinik lab | `GET/POST /diet/foods`, `/diet/clients/:id/labs` | web |
+| Mesaj / görev / talep | `PORTAL_API`'deki tüm yollar (zaten tanımlı) | web + mobil + danışan portalı |
+| Ekler | `POST /diet/attachments` → imzalı yükleme URL'i | web + mobil |
+| Özet | `GET /diet/dashboard` (KPI'lar), `GET /diet/admin/summary` (yönetici) | web + mobil |
+| Abonelik | `diet/saas-billing` → mevcut `saas-billing` controller'ına `diet` eklenir | web (ödeme), mobil (durum) |
+| Cihazlar / push | `POST/DELETE /diet/devices`, `GET/PUT /diet/notification-preferences` + FCM gönderim servisi | mobil |
 
-Her iki durumda da web uygulaması `localStorage` yerine aynı API'yi kullanacak şekilde taşınmalı
-(ilk girişte mevcut localStorage verisini sunucuya yükleyen tek seferlik bir **"verileri buluta taşı"** adımı).
+İzinler: tek `dietRecords` anahtarı yetmez; web'deki rolleri karşılamak için `dietClients`, `dietMedical` (ölçüm, lab, plan), `dietMessages`, `dietSchedule`, `dietAdmin` gibi anahtarlar `permissions.ts`'e eklenir ve `owner/dietitian/assistant/reception` şablonları bunlardan kurulur.
 
-Çoklu kiracılık: her kayıt `clinicId` taşır; personel kendi kliniğinin verisini görür, `assistant`/`reception` tıbbi alanları göremez (sunucu tarafında alan filtresi).
+### Web tarafındaki taşıma
+- `DietStore`, `PortalStore`, `AuthStore` (personel), `SubscriptionStore` localStorage yerine MainAPI'yi kullanır.
+- Web'in kendi worker'ındaki PayTR uçları (`/api/billing/paytr/*`) MainAPI'nin paylaşılan PayTR akışına devredilir; tek ödeme ve abonelik kaynağı MainAPI olur.
+- İlk girişte mevcut localStorage verisini MainAPI'ye yükleyen tek seferlik **"verileri buluta taşı"** adımı.
 
 ## 7. Kimlik doğrulama
 
 - Firebase Auth (e-posta/şifre; ileride Google/Apple ile giriş — iOS'ta üçüncü taraf giriş varsa Apple ile giriş zorunlu).
-- Custom claim'ler: `role: 'dietitian'`, `staffRole`, `clinicId`. Danışan (`member`) hesabı mobil personel uygulamasına giriş yapamaz.
+- Kayıt/doğrulama/profil MainAPI `identity` uçlarından; kiracı ve rol bilgisi Firestore `users/{uid}` profilinden gelir (claim'ler önbellek, rol değişince token yenilenir). Danışan (`member`) hesabı mobil personel uygulamasına giriş yapamaz.
 - Token `expo-secure-store`'da; uygulama açılışında opsiyonel Face ID / parmak izi kilidi (sağlık verisi olduğu için önerilir).
 - E-posta doğrulama ve şifre sıfırlama Firebase üzerinden; bu yüzden canlıda boş olan `environment.firebase` yapılandırması bu projenin de ön koşulu.
 
@@ -180,10 +188,10 @@ ekran görüntüsü önizlemesinde içerik bulanıklaştırma (uygulama arka pla
 
 | Faz | Kapsam | Tahmini süre* |
 |---|---|---|
-| **0 — Karar & altyapı** | MainAPI yığını/reposu, Firebase projesi, Apple Developer ($99/yıl) + Google Play ($25) hesapları, paket adı (`com.odivon.diet`) | 1 hafta |
-| **1 — MainAPI** | Veritabanı şeması, §6'daki uçlar, kimlik/claim'ler, dosya depolama; web'i API'ye bağlama + veri taşıma | 3–4 hafta |
+| **0 — Karar & altyapı** | MainAPI'de diet kapsamı ve izin modeli, Firebase (MainAPI ile aynı proje), Apple Developer ($99/yıl) + Google Play ($25) hesapları, paket adı (`com.odivon.diet`) | 1 hafta |
+| **1 — MainAPI diet modülü** | §6'daki `diet` modülü (Firestore koleksiyonları, uçlar, izinler, testler), saas-billing'e diet, dosya depolama; web'i MainAPI'ye bağlama + veri taşıma | 3–4 hafta |
 | **2 — Mobil MVP (danışman)** | Giriş, Bugün, Danışanlar + detay, ölçüm ekle, görüşmeler, mesajlar, talepler, görevler, ayarlar, koyu mod | 4–5 hafta |
-| **3 — Bildirimler & yönetici** | Push altyapısı, derin bağlantılar, yönetici özeti, ekip, aktivite, abonelik durumu | 2–3 hafta |
+| **3 — Bildirimler & yönetici** | MainAPI'de FCM/Expo push servisi + cihaz kaydı, derin bağlantılar, yönetici özeti, ekip, aktivite, abonelik durumu | 2–3 hafta |
 | **4 — Yayın** | TestFlight / Play iç test, mağaza görselleri ve metinleri, gizlilik beyanları, inceleme | 1–2 hafta |
 | 5 — Sonrası | Mobilde plan düzenleme, offline genişletme, danışan (member) uygulaması | — |
 
@@ -194,7 +202,7 @@ webde girilen veri mobilde, mobilde girilen veri webde anında görünür; yeni 
 
 ## 13. Açık kararlar
 
-1. ~~Backend~~ → **Ortak MainAPI** (karar verildi). Açık: MainAPI şu an çalışıyor mu, hangi teknolojiyle ve hangi repoda yazılacak?
+1. ~~Backend~~ → **Ortak MainAPI** (`AhmetAkif07/OdivonMainApi`, NestJS + Firestore). Açık: `diet` modülünü kim yazacak, MainAPI reposuna doğrudan commit atılabilir mi?
 2. **Platform:** Expo (önerilen) mi, PWA mı?
 3. **Repo:** Mobil aynı repoda monorepo olarak mı (önerilen), ayrı repoda mı?
 4. Danışan (member) mobil uygulaması bu projenin parçası mı, sonraki iş mi?
