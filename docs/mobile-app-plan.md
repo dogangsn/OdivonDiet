@@ -83,7 +83,7 @@ Plan oluşturma/düzenleme (menü mühendisliği), besin kütüphanesi düzenlem
 ┌─────────────┐   ┌──────────────┐
 │ Angular web │   │ Expo mobil   │
 └──────┬──────┘   └──────┬───────┘
-       │  Firebase ID token (role, staffRole, clinicId claim'leri)
+       │  Firebase ID token (role, staffRole, clinicId)
        └────────┬────────┘
           ┌─────▼──────┐        ┌───────────────┐
           │  MainAPI   │───────▶│ Veritabanı    │
@@ -122,9 +122,12 @@ Mobil için gerekli minimum API (mevcut sözleşmelerle uyumlu):
 - `GET /diet/subscription` (PayTR callback'i artık bunu sunucuda güncellemeli)
 - `POST /diet/devices` (push token kaydı), `GET/PUT /diet/notification-preferences`
 
-İki yol:
-1. **Cloudflare Workers + D1 (SQLite) + R2 (dosyalar)** — mevcut `odivon-diet` worker'ına eklenir; aynı deploy hattı, düşük maliyet, hızlı başlangıç. *Önerimiz bu.*
-2. **Ayrı MainAPI** (ör. .NET/Node + PostgreSQL) — `AGENTS.md`'deki "business data must use MainAPI" kuralına birebir uyar; daha fazla altyapı işi. Eğer başka bir ekip/servis bunu zaten yazıyorsa bu yol seçilmeli.
+**Karar (14 Kasım 2026): web ve mobil ortak MainAPI'yi kullanacak** (`https://mainapi.odivon.com/api/v1`, `environment.apiBaseUrl`).
+Bu, `AGENTS.md`'deki "business data must use MainAPI" kuralıyla uyumlu. Cloudflare worker yalnızca statik web + PayTR uçlarını sunmaya devam eder;
+PayTR callback'i ödeme onaylanınca abonelik kaydını MainAPI üzerinden güncellemelidir (`PUT /diet/subscription` veya sunucudan sunucuya bir uç).
+
+MainAPI tarafında netleşmesi gerekenler: teknoloji yığını ve repo, veritabanı (öneri PostgreSQL), dosya depolama (ekler için imzalı URL),
+Firebase ID token doğrulaması + custom claim'leri (`role`, `staffRole`, `clinicId`) atayan uç, push token kaydı ve bildirim gönderimi, ortamlar (test/canlı).
 
 Her iki durumda da web uygulaması `localStorage` yerine aynı API'yi kullanacak şekilde taşınmalı
 (ilk girişte mevcut localStorage verisini sunucuya yükleyen tek seferlik bir **"verileri buluta taşı"** adımı).
@@ -177,8 +180,8 @@ ekran görüntüsü önizlemesinde içerik bulanıklaştırma (uygulama arka pla
 
 | Faz | Kapsam | Tahmini süre* |
 |---|---|---|
-| **0 — Karar & altyapı** | Backend seçimi, Firebase projesi, Apple Developer ($99/yıl) + Google Play ($25) hesapları, paket adı (`com.odivon.diet`) | 1 hafta |
-| **1 — API** | Veritabanı şeması, §6'daki uçlar, kimlik/claim'ler, dosya depolama; web'i API'ye bağlama + veri taşıma | 3–4 hafta |
+| **0 — Karar & altyapı** | MainAPI yığını/reposu, Firebase projesi, Apple Developer ($99/yıl) + Google Play ($25) hesapları, paket adı (`com.odivon.diet`) | 1 hafta |
+| **1 — MainAPI** | Veritabanı şeması, §6'daki uçlar, kimlik/claim'ler, dosya depolama; web'i API'ye bağlama + veri taşıma | 3–4 hafta |
 | **2 — Mobil MVP (danışman)** | Giriş, Bugün, Danışanlar + detay, ölçüm ekle, görüşmeler, mesajlar, talepler, görevler, ayarlar, koyu mod | 4–5 hafta |
 | **3 — Bildirimler & yönetici** | Push altyapısı, derin bağlantılar, yönetici özeti, ekip, aktivite, abonelik durumu | 2–3 hafta |
 | **4 — Yayın** | TestFlight / Play iç test, mağaza görselleri ve metinleri, gizlilik beyanları, inceleme | 1–2 hafta |
@@ -191,7 +194,7 @@ webde girilen veri mobilde, mobilde girilen veri webde anında görünür; yeni 
 
 ## 13. Açık kararlar
 
-1. **Backend:** Cloudflare Workers + D1 mi (önerilen), ayrı bir MainAPI mı? `mainapi.odivon.com` şu an var mı?
+1. ~~Backend~~ → **Ortak MainAPI** (karar verildi). Açık: MainAPI şu an çalışıyor mu, hangi teknolojiyle ve hangi repoda yazılacak?
 2. **Platform:** Expo (önerilen) mi, PWA mı?
 3. **Repo:** Mobil aynı repoda monorepo olarak mı (önerilen), ayrı repoda mı?
 4. Danışan (member) mobil uygulaması bu projenin parçası mı, sonraki iş mi?
