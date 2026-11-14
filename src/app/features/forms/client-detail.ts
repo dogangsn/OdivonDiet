@@ -527,17 +527,24 @@ export class ClientDetail {
 
   saveLiveSession(clientId: string): void {
     const weight = this.sessionWeightKg();
-    if (weight >= 30 && weight <= 250) {
-      this.store.addMeasurement({
-        clientId,
-        date: isoDate(new Date()),
-        weightKg: weight,
-        waistCm: this.sessionWaistCm(),
-        hipCm: null,
-        bodyFatPct: null,
-        note: this.soapNote().trim() || 'Canlı seans ölçümü',
-      });
+    if (!Number.isFinite(weight) || weight < 30 || weight > 250) {
+      this.notify.warning('Geçersiz tartı değeri', 'Lütfen 30 ile 250 kg arasında geçerli bir ağırlık girin.');
+      return;
     }
+    const waist = this.sessionWaistCm();
+    if (waist !== null && (waist < 35 || waist > 250)) {
+      this.notify.warning('Geçersiz bel çevresi', 'Bel çevresi 35 ile 250 cm arasında olmalıdır.');
+      return;
+    }
+    this.store.addMeasurement({
+      clientId,
+      date: isoDate(new Date()),
+      weightKg: weight,
+      waistCm: waist,
+      hipCm: null,
+      bodyFatPct: null,
+      note: this.soapNote().trim() || 'Canlı seans ölçümü',
+    });
 
     const scheduled = this.store
       .consultations()

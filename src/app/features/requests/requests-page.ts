@@ -208,7 +208,11 @@ export class RequestsPage {
   respond(): void {
     const r = this.selected();
     if (!r) return;
-    this.portal.respondToRequest(r.id, this.status(), this.response(), this.auth.session()?.name ?? 'Diyetisyen');
+    if (!this.response().trim()) {
+      this.notify.warning('Yanıt metni zorunludur', 'Lütfen danışana iletilecek kısa bir açıklama yazın.');
+      return;
+    }
+    this.portal.respondToRequest(r.id, this.status(), this.response().trim(), this.auth.session()?.name ?? 'Diyetisyen');
     this.notify.success('Yanıt gönderildi', 'Danışan portalda bilgilendirildi.');
     this.openRequest(null);
   }

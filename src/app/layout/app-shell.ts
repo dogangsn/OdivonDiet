@@ -6,7 +6,7 @@ import { DietStore } from '../core/data/diet-store';
 import { PortalStore } from '../core/data/portal-store';
 import { I18nStore, SupportedLang } from '../core/i18n/i18n';
 import { ThemeStore } from '../core/theme/theme-store';
-import { PRODUCT_NAVIGATION } from '../domain/domain-navigation';
+import { NavigationGroup, PRODUCT_NAVIGATION } from '../domain/domain-navigation';
 import { PRODUCT } from '../domain/product-manifest';
 import { staffRoleById } from '../domain/staff-rbac';
 import { QuickActionHost } from '../features/forms/quick-action-host';
@@ -71,46 +71,89 @@ import { VersionBadge } from '../shared/ui/version-badge';
         </div>
 
         <nav aria-label="Ana menü" class="custom-scroll flex-1 overflow-y-auto px-3 pb-4">
-          @for (group of navigation; track group.label) {
-            <p
-              class="px-3 pb-1.5 pt-5 text-[11px] font-bold uppercase tracking-wider text-slate-400"
+          <div class="flex items-center justify-between px-3 pb-1 pt-2">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+              Modül Grupları
+            </span>
+            <button
+              type="button"
+              (click)="toggleAllGroups()"
+              class="inline-flex items-center gap-0.5 rounded-md px-1.5 py-0.5 text-[10px] font-bold text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+              [attr.aria-label]="
+                collapsedGroups().length ? 'Tüm menü gruplarını aç' : 'Tüm menü gruplarını daralt'
+              "
             >
-              {{ group.label }}
-            </p>
-            <ul class="space-y-0.5">
-              @for (item of group.items; track item.path) {
-                <li>
-                  <a
-                    [routerLink]="item.path"
-                    routerLinkActive="!bg-violet-50 !text-violet-700 dark:!bg-violet-500/15 dark:!text-violet-200"
-                    #rla="routerLinkActive"
-                    [attr.aria-current]="rla.isActive ? 'page' : null"
-                    class="group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
-                    (click)="mobileOpen.set(false)"
-                  >
+              <span class="material-symbols-rounded !text-xs">
+                {{ collapsedGroups().length ? 'unfold_more' : 'unfold_less' }}
+              </span>
+              {{ collapsedGroups().length ? 'Tümünü Aç' : 'Daralt' }}
+            </button>
+          </div>
+
+          @for (group of navigation; track group.label) {
+            <div class="mt-2 first:mt-1">
+              <button
+                type="button"
+                (click)="toggleGroup(group.label)"
+                [attr.aria-expanded]="isGroupOpen(group.label)"
+                class="flex w-full items-center justify-between rounded-lg px-3 py-1.5 text-start text-[11px] font-bold uppercase tracking-wider text-slate-400 transition hover:bg-slate-50 hover:text-slate-700 dark:hover:bg-slate-800/60 dark:hover:text-slate-200"
+              >
+                <span>{{ group.label }}</span>
+                <span class="flex items-center gap-1.5">
+                  @if (!isGroupOpen(group.label) && groupBadgeCount(group); as total) {
                     <span
-                      class="nav-icon material-symbols-rounded"
-                      [class.icon-fill]="rla.isActive"
-                      >{{ item.icon }}</span
+                      class="tabular rounded-full bg-violet-100 px-1.5 py-0.5 text-[10px] font-extrabold text-violet-700 dark:bg-violet-950 dark:text-violet-300"
                     >
-                    <span class="flex-1">{{ item.label }}</span>
-                    @if (isNavLocked(item.path)) {
-                      <span
-                        class="material-symbols-rounded !text-base text-rose-500"
-                        aria-label="Kilitli ekran"
-                        title="Paket veya rol kısıtlaması"
-                        >lock</span
+                      {{ total }}
+                    </span>
+                  }
+                  <span
+                    class="material-symbols-rounded !text-base transition-transform duration-200"
+                    [class.-rotate-90]="!isGroupOpen(group.label)"
+                    aria-hidden="true"
+                  >
+                    expand_more
+                  </span>
+                </span>
+              </button>
+
+              @if (isGroupOpen(group.label)) {
+                <ul class="mt-0.5 space-y-0.5">
+                  @for (item of group.items; track item.path) {
+                    <li>
+                      <a
+                        [routerLink]="item.path"
+                        routerLinkActive="!bg-violet-50 !text-violet-700 dark:!bg-violet-500/15 dark:!text-violet-200"
+                        #rla="routerLinkActive"
+                        [attr.aria-current]="rla.isActive ? 'page' : null"
+                        class="group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
+                        (click)="mobileOpen.set(false)"
                       >
-                    } @else if (badge(item.path); as count) {
-                      <span
-                        class="tabular rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-500 group-hover:bg-white dark:bg-slate-800 dark:text-slate-300"
-                        >{{ count }}</span
-                      >
-                    }
-                  </a>
-                </li>
+                        <span
+                          class="nav-icon material-symbols-rounded"
+                          [class.icon-fill]="rla.isActive"
+                          >{{ item.icon }}</span
+                        >
+                        <span class="flex-1">{{ item.label }}</span>
+                        @if (isNavLocked(item.path)) {
+                          <span
+                            class="material-symbols-rounded !text-base text-rose-500"
+                            aria-label="Kilitli ekran"
+                            title="Paket veya rol kısıtlaması"
+                            >lock</span
+                          >
+                        } @else if (badge(item.path); as count) {
+                          <span
+                            class="tabular rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-500 group-hover:bg-white dark:bg-slate-800 dark:text-slate-300"
+                            >{{ count }}</span
+                          >
+                        }
+                      </a>
+                    </li>
+                  }
+                </ul>
               }
-            </ul>
+            </div>
           }
         </nav>
 
@@ -387,9 +430,11 @@ export class AppShell {
   private readonly store = inject(DietStore);
   private readonly portal = inject(PortalStore);
   private readonly router = inject(Router);
+  private readonly navStorageKey = 'odivon:nav-collapsed';
   readonly mobileOpen = signal(false);
   readonly paletteOpen = signal(false);
   readonly paletteQuery = signal('');
+  readonly collapsedGroups = signal<string[]>(this.restoreCollapsedGroups());
 
   readonly paletteClients = computed(() => {
     const q = this.paletteQuery().trim().toLocaleLowerCase('tr');
@@ -438,6 +483,46 @@ export class AppShell {
 
   badge(path: string): number {
     return this.badges()[path] ?? 0;
+  }
+
+  isGroupOpen(label: string): boolean {
+    return !this.collapsedGroups().includes(label);
+  }
+
+  toggleGroup(label: string): void {
+    const current = this.collapsedGroups();
+    const next = current.includes(label)
+      ? current.filter((x) => x !== label)
+      : [...current, label];
+    this.saveCollapsedGroups(next);
+  }
+
+  toggleAllGroups(): void {
+    const next =
+      this.collapsedGroups().length > 0 ? [] : this.navigation.map((g) => g.label);
+    this.saveCollapsedGroups(next);
+  }
+
+  groupBadgeCount(group: NavigationGroup): number {
+    return group.items.reduce((sum, item) => sum + this.badge(item.path), 0);
+  }
+
+  private saveCollapsedGroups(list: string[]): void {
+    try {
+      localStorage.setItem(this.navStorageKey, JSON.stringify(list));
+    } catch {
+      // keep in memory
+    }
+    this.collapsedGroups.set(list);
+  }
+
+  private restoreCollapsedGroups(): string[] {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(this.navStorageKey) ?? 'null');
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
   }
 
   search(event: Event, value: string): void {

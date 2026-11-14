@@ -150,8 +150,24 @@ export class MeasurementForm {
     required(p.weightKg);
     min(p.weightKg, 30);
     max(p.weightKg, 300);
+    min(p.waistCm, 35);
+    max(p.waistCm, 250);
+    min(p.hipCm, 40);
+    max(p.hipCm, 250);
     min(p.bodyFatPct, 2);
     max(p.bodyFatPct, 70);
+    min(p.muscleMassKg, 10);
+    max(p.muscleMassKg, 120);
+    min(p.visceralFatRating, 1);
+    max(p.visceralFatRating, 30);
+    min(p.bodyWaterPct, 25);
+    max(p.bodyWaterPct, 85);
+    min(p.ecwTbwRatio, 0.3);
+    max(p.ecwTbwRatio, 0.5);
+    min(p.phaseAngleDeg, 2);
+    max(p.phaseAngleDeg, 15);
+    min(p.neckCm, 20);
+    max(p.neckCm, 70);
   });
   readonly delta = computed(() => {
     const v = this.model();

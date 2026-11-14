@@ -1,4 +1,4 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { AuthStore } from '../../core/auth/auth-store';
 import { MemberPortal } from '../../core/data/member-portal';
@@ -14,6 +14,11 @@ interface PortalNavItem {
   readonly tab: boolean;
 }
 
+interface PortalNavGroup {
+  readonly label: string;
+  readonly items: readonly PortalNavItem[];
+}
+
 const NAV: readonly PortalNavItem[] = [
   { path: '/portal', icon: 'home', label: 'Özet', tab: true },
   { path: '/portal/plan', icon: 'restaurant_menu', label: 'Planım', tab: true },
@@ -22,6 +27,17 @@ const NAV: readonly PortalNavItem[] = [
   { path: '/portal/messages', icon: 'forum', label: 'Mesajlar', tab: true },
   { path: '/portal/requests', icon: 'inbox', label: 'Taleplerim', tab: false },
   { path: '/portal/profile', icon: 'person', label: 'Profilim', tab: false },
+];
+
+const NAV_GROUPS: readonly PortalNavGroup[] = [
+  {
+    label: 'Beslenme & Takip',
+    items: NAV.slice(0, 4),
+  },
+  {
+    label: 'İletişim & Hesap',
+    items: NAV.slice(4),
+  },
 ];
 
 /** Layout for members: sidebar on desktop, bottom tab bar on phones. */
@@ -50,31 +66,52 @@ const NAV: readonly PortalNavItem[] = [
             <span class="block text-[11px] font-medium text-slate-400">Danışan portalı</span>
           </span>
         </a>
-        <nav aria-label="Portal" class="flex-1 px-3 pt-4">
-          <ul class="space-y-0.5">
-            @for (item of nav; track item.path) {
-              <li>
-                <a
-                  [routerLink]="item.path"
-                  routerLinkActive="!bg-emerald-50 !text-emerald-800 dark:!bg-emerald-500/15 dark:!text-emerald-200"
-                  [routerLinkActiveOptions]="{ exact: item.path === '/portal' }"
-                  #rla="routerLinkActive"
-                  [attr.aria-current]="rla.isActive ? 'page' : null"
-                  class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
+        <nav aria-label="Portal" class="flex-1 space-y-2 px-3 pt-4">
+          @for (group of navGroups; track group.label) {
+            <div>
+              <button
+                type="button"
+                (click)="toggleGroup(group.label)"
+                [attr.aria-expanded]="isGroupOpen(group.label)"
+                class="flex w-full items-center justify-between rounded-lg px-3 py-1.5 text-start text-[11px] font-bold uppercase tracking-wider text-slate-400 transition hover:bg-slate-50 hover:text-slate-700 dark:hover:bg-slate-800/60 dark:hover:text-slate-200"
+              >
+                <span>{{ group.label }}</span>
+                <span
+                  class="material-symbols-rounded !text-base transition-transform duration-200"
+                  [class.-rotate-90]="!isGroupOpen(group.label)"
+                  aria-hidden="true"
                 >
-                  <span class="material-symbols-rounded" [class.icon-fill]="rla.isActive" aria-hidden="true">{{
-                    item.icon
-                  }}</span>
-                  <span class="flex-1">{{ item.label }}</span>
-                  @if (badge(item.path); as count) {
-                    <span class="tabular rounded-full bg-emerald-600 px-2 py-0.5 text-[11px] font-bold text-white">{{
-                      count
-                    }}</span>
+                  expand_more
+                </span>
+              </button>
+              @if (isGroupOpen(group.label)) {
+                <ul class="mt-0.5 space-y-0.5">
+                  @for (item of group.items; track item.path) {
+                    <li>
+                      <a
+                        [routerLink]="item.path"
+                        routerLinkActive="!bg-emerald-50 !text-emerald-800 dark:!bg-emerald-500/15 dark:!text-emerald-200"
+                        [routerLinkActiveOptions]="{ exact: item.path === '/portal' }"
+                        #rla="routerLinkActive"
+                        [attr.aria-current]="rla.isActive ? 'page' : null"
+                        class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
+                      >
+                        <span class="material-symbols-rounded" [class.icon-fill]="rla.isActive" aria-hidden="true">{{
+                          item.icon
+                        }}</span>
+                        <span class="flex-1">{{ item.label }}</span>
+                        @if (badge(item.path); as count) {
+                          <span class="tabular rounded-full bg-emerald-600 px-2 py-0.5 text-[11px] font-bold text-white">{{
+                            count
+                          }}</span>
+                        }
+                      </a>
+                    </li>
                   }
-                </a>
-              </li>
-            }
-          </ul>
+                </ul>
+              }
+            </div>
+          }
         </nav>
         <div class="border-t border-slate-100 p-3 dark:border-slate-800">
           @if (auth.session()?.sample) {
@@ -173,7 +210,9 @@ const NAV: readonly PortalNavItem[] = [
 export class PortalShell {
   readonly product = PRODUCT;
   readonly nav = NAV;
+  readonly navGroups = NAV_GROUPS;
   readonly tabs = NAV.filter((n) => n.tab);
+  readonly collapsedGroups = signal<string[]>([]);
   /** Single-practice for now; MainAPI's `/portal/me` will return the assigned dietitian. */
   readonly dietitianName = 'Dyt. Deniz Arslan';
   readonly auth = inject(AuthStore);
@@ -188,6 +227,16 @@ export class PortalShell {
 
   badge(path: string): number {
     return this.badges()[path] ?? 0;
+  }
+
+  isGroupOpen(label: string): boolean {
+    return !this.collapsedGroups().includes(label);
+  }
+
+  toggleGroup(label: string): void {
+    this.collapsedGroups.update((list) =>
+      list.includes(label) ? list.filter((x) => x !== label) : [...list, label],
+    );
   }
 
   logout(): void {

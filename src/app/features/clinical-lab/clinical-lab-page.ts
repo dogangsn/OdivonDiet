@@ -1,5 +1,5 @@
 import { DatePipe, DecimalPipe } from '@angular/common';
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DietStore } from '../../core/data/diet-store';
 import { Notify } from '../../core/notify/notify';
@@ -1467,8 +1467,65 @@ export class ClinicalLabPage {
     notes: '',
   };
 
+  constructor() {
+    effect(() => {
+      const clientId = this.selectedClientId();
+      untracked(() => {
+        const existingGlp1 = this.store.glp1ProfileFor(clientId);
+        this.glp1Draft = existingGlp1
+          ? { ...existingGlp1 }
+          : {
+              clientId,
+              stage: 'glp1_titration',
+              agentName: 'Semaglutid (Ozempic)',
+              weeklyDoseMg: 0.5,
+              injectionDay: 'Pazar',
+              giSymptomScore: 2,
+              bristolStoolType: 3,
+              resistanceTrainingDays: 3,
+              notes: '',
+            };
+        const latest = this.store.labsFor(clientId)[0];
+        if (latest) {
+          this.labDraft = {
+            fastingGlucoseMgDl: latest.fastingGlucoseMgDl ?? 94,
+            fastingInsulinUiuMl: latest.fastingInsulinUiuMl ?? 9.2,
+            hba1cPct: latest.hba1cPct ?? 5.4,
+            triglyceridesMgDl: latest.triglyceridesMgDl ?? 120,
+            hdlMgDl: latest.hdlMgDl ?? 55,
+            ldlMgDl: latest.ldlMgDl ?? 110,
+            ferritinNgMl: latest.ferritinNgMl ?? 48,
+            vitaminDNgMl: latest.vitaminDNgMl ?? 36,
+            vitaminB12PgMl: latest.vitaminB12PgMl ?? 420,
+            tshMiuL: latest.tshMiuL ?? 1.9,
+            uricAcidMgDl: latest.uricAcidMgDl ?? 5.1,
+            crpMgL: latest.crpMgL ?? 1.1,
+          };
+        }
+      });
+    });
+  }
+
   saveLab(event: Event): void {
     event.preventDefault();
+    const d = this.labDraft;
+    if (
+      d.fastingGlucoseMgDl < 30 ||
+      d.fastingGlucoseMgDl > 600 ||
+      d.fastingInsulinUiuMl < 0.5 ||
+      d.fastingInsulinUiuMl > 250 ||
+      d.hba1cPct < 3 ||
+      d.hba1cPct > 20 ||
+      d.triglyceridesMgDl < 10 ||
+      d.hdlMgDl < 10 ||
+      d.ldlMgDl < 10
+    ) {
+      this.notify.warning(
+        'Fizyolojik sınır dışı tahlil değeri',
+        'Lütfen glukoz (30–600 mg/dL), insülin (0.5–250 µIU/mL), HbA1c (%3–20) ve lipid değerlerini kontrol edin.',
+      );
+      return;
+    }
     this.store.saveLabPanel({
       clientId: this.selectedClientId(),
       date: isoDate(new Date()),
@@ -1480,7 +1537,10 @@ export class ClinicalLabPage {
 
   addMed(event: Event): void {
     event.preventDefault();
-    if (!this.medDraft.name.trim()) return;
+    if (!this.medDraft.name.trim()) {
+      this.notify.warning('İlaç adı zorunludur', 'Lütfen ticari ilaç adını girin (örn. Euthyrox, Glucophage).');
+      return;
+    }
     this.store.addMedication({
       clientId: this.selectedClientId(),
       name: this.medDraft.name.trim(),
@@ -1494,7 +1554,10 @@ export class ClinicalLabPage {
 
   addSup(event: Event): void {
     event.preventDefault();
-    if (!this.supDraft.name.trim()) return;
+    if (!this.supDraft.name.trim()) {
+      this.notify.warning('Takviye adı zorunludur', 'Lütfen eklenecek vitamin/mineral adını girin.');
+      return;
+    }
     this.store.addSupplement({
       clientId: this.selectedClientId(),
       name: this.supDraft.name.trim(),
@@ -1510,6 +1573,19 @@ export class ClinicalLabPage {
 
   saveGlp1(event: Event): void {
     event.preventDefault();
+    if (
+      this.glp1Draft.weeklyDoseMg < 0 ||
+      this.glp1Draft.giSymptomScore < 1 ||
+      this.glp1Draft.giSymptomScore > 5 ||
+      this.glp1Draft.resistanceTrainingDays < 0 ||
+      this.glp1Draft.resistanceTrainingDays > 7
+    ) {
+      this.notify.warning(
+        'Geçersiz GLP-1 takip değeri',
+        'GI skoru 1–5, direnç antrenmanı 0–7 gün aralığında olmalıdır.',
+      );
+      return;
+    }
     this.store.saveGlp1Profile({
       ...this.glp1Draft,
       clientId: this.selectedClientId(),

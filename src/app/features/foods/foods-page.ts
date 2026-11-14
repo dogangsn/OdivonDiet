@@ -881,8 +881,12 @@ export class FoodsPage {
 
   saveFood(): void {
     const d = this.draft();
-    if (!d.name.trim() || !d.unit.trim() || d.grams <= 0) {
-      this.editorError.set('Lütfen besin adını, porsiyon birimini ve geçerli bir gramajı girin.');
+    if (!d.name.trim() || !d.unit.trim() || d.grams <= 0 || d.grams > 5000) {
+      this.editorError.set('Lütfen besin adını, porsiyon birimini ve geçerli bir gramajı (1–5000 g) girin.');
+      return;
+    }
+    if (d.proteinG < 0 || d.carbG < 0 || d.fatG < 0 || d.fiberG < 0 || d.kcal < 0) {
+      this.editorError.set('Makro besin ve enerji (kcal) değerleri negatif olamaz.');
       return;
     }
     const saved = this.store.saveFood({
