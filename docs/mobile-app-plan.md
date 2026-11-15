@@ -119,23 +119,27 @@ Bu dosyalar zaten framework bağımsız saf TypeScript olduğundan doğrudan pay
 - **`diet` ürünü sadece kayıtlı**: `PRODUCT_MODULES` listesinde `diet` var, tek bir izin anahtarı (`dietRecords`) ve hoş geldin e-postası tanımlı; **ama hiçbir diet controller'ı / endpoint'i yok.** Web'in `DietApiService` ve `PORTAL_API`'de beklediği `/diet/...` uçları MainAPI'de karşılıksız.
 - **Push bildirim altyapısı yok** (FCM / cihaz token kaydı bulunmuyor).
 
-### MainAPI'ye eklenecek `diet` modülü
-Mevcut ürün modülleri (`fgas`, `gym`) örnek alınarak `src/modules/diet/` açılır; tüm uçlar `ModuleGuard('diet')` + `@RequirePermission` ile korunur, veri `tenants/{tenantId}/diet_*` koleksiyonlarına yazılır.
+### MainAPI `diet` modülü (yazıldı, 15 Kasım 2026)
+`src/modules/diet/` — tüm uçlar `FirebaseAuth + Tenant + EmailVerified + Subscription + Module('diet') + Permission` guard'larıyla korunur, veri `tenants/{tenantId}/diet*` koleksiyonlarında.
 
-| Alan | Uçlar | Kullanan |
+| Alan | Uçlar (`/api/v1/diet/...`) | İzin |
 |---|---|---|
-| Danışanlar | `GET/POST /diet/clients`, `GET/PATCH /diet/clients/:id`, arşivle | web + mobil |
-| Ölçümler | `GET/POST /diet/clients/:id/measurements` | web + mobil |
-| Görüşmeler | `GET /diet/consultations?from&to`, `POST/PATCH /diet/consultations/:id` | web + mobil |
-| Planlar | `GET /diet/plans?clientId=`, `POST/PATCH /diet/plans/:id` | web (yazma), mobil (okuma) |
-| Besinler, klinik lab | `GET/POST /diet/foods`, `/diet/clients/:id/labs` | web |
-| Mesaj / görev / talep | `PORTAL_API`'deki tüm yollar (zaten tanımlı) | web + mobil + danışan portalı |
-| Ekler | `POST /diet/attachments` → imzalı yükleme URL'i | web + mobil |
-| Özet | `GET /diet/dashboard` (KPI'lar), `GET /diet/admin/summary` (yönetici) | web + mobil |
-| Abonelik | `diet/saas-billing` → mevcut `saas-billing` controller'ına `diet` eklenir | web (ödeme), mobil (durum) |
-| Cihazlar / push | `POST/DELETE /diet/devices`, `GET/PUT /diet/notification-preferences` + FCM gönderim servisi | mobil |
+| Bugün ekranı | `GET dashboard` | dietClients:view |
+| Yönetici özeti | `GET admin/summary` | dietReports:view |
+| Danışanlar | `GET/POST clients`, `GET/PATCH/DELETE clients/:id`, `GET clients/:id/overview` | dietClients |
+| Ölçümler | `GET/POST clients/:id/measurements`, `DELETE measurements/:id` | dietClinical |
+| Görüşmeler | `GET consultations?from&to&clientId&dietitianId`, `POST`, `PATCH/DELETE consultations/:id` | dietSchedule |
+| Planlar | `GET plans?clientId`, `GET/PATCH/DELETE plans/:id`, `POST plans` | dietClinical |
+| Mesajlar | `GET conversations`, `GET/POST conversations/:clientId/messages`, `POST conversations/:clientId/read` | dietMessages |
+| Görevler | `GET tasks`, `GET/POST clients/:id/tasks`, `PATCH/DELETE tasks/:id` | dietMessages |
+| Talepler | `GET/POST requests`, `PATCH requests/:id` | dietMessages |
+| Push / tercih | `POST devices`, `POST devices/unregister`, `GET/PUT notification-preferences` | oturum yeterli |
+| Abonelik | `diet/saas-billing/*` (ortak PayTR) | owner/admin |
+| Rol şablonları | `GET roles/templates` (diyetisyen, asistan, ön büro) | — |
 
-İzinler: tek `dietRecords` anahtarı yetmez; web'deki rolleri karşılamak için `dietClients`, `dietMedical` (ölçüm, lab, plan), `dietMessages`, `dietSchedule`, `dietAdmin` gibi anahtarlar `permissions.ts`'e eklenir ve `owner/dietitian/assistant/reception` şablonları bunlardan kurulur.
+Kurallar: `dietClinical:view` izni olmayan personel (ör. ön büro) danışanın hastalık/alerji/klinik notlarını ve görüşme notlarını görmez; ölçüm eklenince danışanın güncel kilosu güncellenir; bir danışanın tek aktif planı olur; görev ve talep güncellemeleri sohbete sistem mesajı olarak düşer.
+
+Henüz yok: danışan (member) tarafı uçları, push gönderimi (token'lar kaydediliyor), dosya yükleme (imzalı URL), besin kütüphanesi ve klinik lab.
 
 ### Web tarafındaki taşıma
 - `DietStore`, `PortalStore`, `AuthStore` (personel), `SubscriptionStore` localStorage yerine MainAPI'yi kullanır.
