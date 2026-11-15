@@ -32,6 +32,7 @@ export const STAFF_ROLES: readonly StaffRoleDefinition[] = [
       'Tüm klinik modüller, diyet planlama, biyokimya, abonelik/fatura ve kullanıcı yetkilendirme tam yetki.',
     allowedPaths: [
       '/overview',
+      '/ai-copilot',
       '/clients',
       '/plans',
       '/foods',
@@ -64,6 +65,7 @@ export const STAFF_ROLES: readonly StaffRoleDefinition[] = [
       'Danışan takibi, menü mühendisliği, klinik laboratuvar, ölçümler ve danışan portalı tam yetki.',
     allowedPaths: [
       '/overview',
+      '/ai-copilot',
       '/clients',
       '/plans',
       '/foods',

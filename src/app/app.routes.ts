@@ -55,6 +55,12 @@ export const routes: Routes = [
           import('./features/overview/overview-page').then((m) => m.OverviewPage),
       },
       {
+        path: 'ai-copilot',
+        title: 'AI NutriPilot & Dijital Klinik Büyüme · OdivonDiet',
+        loadComponent: () =>
+          import('./features/ai-copilot/ai-copilot-page').then((m) => m.AiCopilotPage),
+      },
+      {
         path: 'clients',
         title: 'Danışanlar · OdivonDiet',
         loadComponent: () => import('./features/clients/clients-page').then((m) => m.ClientsPage),

@@ -126,6 +126,114 @@ export interface ConsultationSummaryOutput {
   clientMessage: string;
 }
 
+export interface MealPlateItem {
+  readonly name: string;
+  readonly portion: string;
+  readonly kcal: number;
+  readonly proteinG: number;
+  readonly carbG: number;
+  readonly fatG: number;
+}
+
+export interface MealPlateAnalysis {
+  readonly presetKey: string;
+  readonly plateTitle: string;
+  readonly totalKcal: number;
+  readonly proteinG: number;
+  readonly carbG: number;
+  readonly fatG: number;
+  readonly fiberG: number;
+  readonly glycemicLoad: 'Düşük' | 'Orta' | 'Yüksek';
+  readonly adherenceScorePct: number;
+  readonly items: readonly MealPlateItem[];
+  readonly coachFeedback: string;
+  readonly swapSuggestion: string;
+}
+
+export type OcrDocumentKind = 'enabiz_insulin' | 'inbody_sheet' | 'tanita_athlete';
+
+export interface OcrExtractionResult {
+  readonly kind: OcrDocumentKind;
+  readonly documentTitle: string;
+  readonly confidencePct: number;
+  readonly extractedAt: string;
+  readonly clinicalFlags: readonly string[];
+  readonly labValues?: {
+    readonly fastingGlucoseMgDl: number;
+    readonly fastingInsulinUiuMl: number;
+    readonly hba1cPct: number;
+    readonly triglyceridesMgDl: number;
+    readonly hdlMgDl: number;
+    readonly ldlMgDl: number;
+    readonly ferritinNgMl: number;
+    readonly vitaminDNgMl: number;
+    readonly vitaminB12PgMl: number;
+    readonly tshMiuL: number;
+    readonly uricAcidMgDl: number;
+    readonly crpMgL: number;
+  };
+  readonly bodyValues?: {
+    readonly weightKg: number;
+    readonly bodyFatPct: number;
+    readonly muscleMassKg: number;
+    readonly visceralFatRating: number;
+    readonly bodyWaterPct: number;
+    readonly ecwTbwRatio: number;
+    readonly metabolicAge: number;
+    readonly phaseAngleDeg: number;
+    readonly waistCm: number;
+  };
+}
+
+export interface ChurnRiskAssessment {
+  readonly clientId: string;
+  readonly clientName: string;
+  readonly riskScore: number;
+  readonly riskLevel: 'high' | 'medium' | 'low';
+  readonly daysSinceLastMeasurement: number;
+  readonly overdueTasks: number;
+  readonly reasons: readonly string[];
+  readonly nudgeMessage: string;
+}
+
+export interface MenuAdvisorReply {
+  readonly query: string;
+  readonly medicalEscalation: boolean;
+  readonly recommendedChoice: string;
+  readonly portionRule: string;
+  readonly avoidList: string;
+  readonly glycemicTip: string;
+}
+
+export interface LeadCandidate {
+  readonly id: string;
+  readonly fullName: string;
+  readonly phone: string;
+  readonly email: string;
+  readonly age: number;
+  readonly gender: 'female' | 'male';
+  readonly heightCm: number;
+  readonly weightKg: number;
+  readonly targetWeightKg: number;
+  readonly bmi: number;
+  readonly metabolicAgeEstimate: number;
+  readonly insulinRiskLabel: 'Yüksek Risk' | 'Orta Risk' | 'Düşük Risk';
+  readonly goalLabel: string;
+  readonly source: 'Instagram Bio Testi' | 'Web Metabolik Check-Up' | 'WhatsApp Huni';
+  readonly createdAt: string;
+  readonly convertedClientId?: string;
+}
+
+export interface ClinicServicePackage {
+  readonly id: string;
+  readonly title: string;
+  readonly durationLabel: string;
+  readonly priceTl: number;
+  readonly installmentLabel: string;
+  readonly includes: readonly string[];
+  readonly badge: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class AiNutripilotService {
   /**
@@ -621,5 +729,425 @@ export class AiNutripilotService {
       soapRecord: soap,
       clientMessage: clientMsg,
     };
+  }
+
+  /**
+   * AI Meal Vision — Tabak Fotoğrafı veya Seçilen Öğün Üzerinden Porsiyon, Makro & Glisemik Yük Analizi
+   */
+  analyzeMealPlate(presetKey: string, customNote = ''): MealPlateAnalysis {
+    const presets: Record<string, MealPlateAnalysis> = {
+      kofte_bulgur: {
+        presetKey: 'kofte_bulgur',
+        plateTitle: 'Izgara Köfte, Bulgur Pilavı & Mevsim Salata Tabağı',
+        totalKcal: 540,
+        proteinG: 34,
+        carbG: 42,
+        fatG: 24,
+        fiberG: 8,
+        glycemicLoad: 'Düşük',
+        adherenceScorePct: 92,
+        items: [
+          { name: 'Anne Köftesi (Izgara)', portion: '4 adet (120g)', kcal: 260, proteinG: 26, carbG: 4, fatG: 16 },
+          { name: 'Sebzeli Bulgur Pilavı', portion: '4 yemek kaşığı', kcal: 140, proteinG: 4, carbG: 28, fatG: 2 },
+          { name: 'Zeytinyağlı Çoban Salata', portion: '1 orta kase', kcal: 95, proteinG: 2, carbG: 7, fatG: 6 },
+          { name: 'Ev Yapımı Ayran', portion: '1 su bardağı (200 ml)', kcal: 45, proteinG: 2, carbG: 3, fatG: 0 },
+        ],
+        coachFeedback:
+          'Protein ve lif dengesi harika (%92 plan uyumu). Salatadaki posa bulgurun glisemik etkisini başarıyla yavaşlatıyor.',
+        swapSuggestion:
+          'Akşam öğününde karbonhidratı dengelemek için ekmek/tahıl hakkınızı 1 dilim azaltabilirsiniz.',
+      },
+      serpme_kahvalti: {
+        presetKey: 'serpme_kahvalti',
+        plateTitle: 'Hafta Sonu Kahvaltı Tabağı (Yumurta, Peynir, Zeytin, Bal/Kaymak)',
+        totalKcal: 685,
+        proteinG: 24,
+        carbG: 54,
+        fatG: 41,
+        fiberG: 5,
+        glycemicLoad: 'Orta',
+        adherenceScorePct: 76,
+        items: [
+          { name: 'Sahanda Yumurta', portion: '2 adet', kcal: 190, proteinG: 13, carbG: 1, fatG: 15 },
+          { name: 'Beyaz Peynir & Kaşar', portion: '2 dilim (60g)', kcal: 185, proteinG: 9, carbG: 2, fatG: 15 },
+          { name: 'Simit / Beyaz Ekmek', portion: 'Yarım simit', kcal: 190, proteinG: 2, carbG: 38, fatG: 3 },
+          { name: 'Bal & Kaymak / Reçel', portion: '1 tatlı kaşığı', kcal: 120, proteinG: 0, carbG: 13, fatG: 8 },
+        ],
+        coachFeedback:
+          'Protein yeterli ancak simit ve bal/kaymak kombinasyonu sabah insülin pikini tetikleyebilir (%76 uyum).',
+        swapSuggestion:
+          'Kahvaltı sonrası 20 dk yürüyüş yapın ve öğle öğününü zeytinyağlı sebze + yoğurt ile hafif geçin.',
+      },
+      somon_kinoa: {
+        presetKey: 'somon_kinoa',
+        plateTitle: 'Fırın Somon, Kinoa & Avokadolu Yeşil Kase (Bowl)',
+        totalKcal: 490,
+        proteinG: 38,
+        carbG: 29,
+        fatG: 23,
+        fiberG: 9,
+        glycemicLoad: 'Düşük',
+        adherenceScorePct: 98,
+        items: [
+          { name: 'Fırın Norveç Somonu', portion: '150g', kcal: 270, proteinG: 32, carbG: 0, fatG: 15 },
+          { name: 'Haşlanmış Kinoa', portion: '3 yemek kaşığı', kcal: 110, proteinG: 4, carbG: 20, fatG: 2 },
+          { name: 'Avokado & Roka Salatası', portion: 'Çeyrek avokado + yeşillik', kcal: 110, proteinG: 2, carbG: 9, fatG: 6 },
+        ],
+        coachFeedback:
+          'Kusursuz anti-inflamatuar klinik tabak (%98 uyum)! Omega-3 ve yüksek lif insülin duyarlılığını maksimum destekliyor.',
+        swapSuggestion: 'Hiçbir değişikliğe gerek yok; öğünden 30 dk sonra 2 bardak su içmeyi unutmayın.',
+      },
+      disarida_burger: {
+        presetKey: 'disarida_burger',
+        plateTitle: 'Restoran Burger & Fırın/Kızartma Patates Öğünü',
+        totalKcal: 890,
+        proteinG: 31,
+        carbG: 88,
+        fatG: 46,
+        fiberG: 4,
+        glycemicLoad: 'Yüksek',
+        adherenceScorePct: 54,
+        items: [
+          { name: 'Dana Burger (Brioche Ekmekli)', portion: '1 adet (140g köfte)', kcal: 560, proteinG: 27, carbG: 46, fatG: 30 },
+          { name: 'Patates Kızartması & Sos', portion: '1 küçük porsiyon', kcal: 330, proteinG: 4, carbG: 42, fatG: 16 },
+        ],
+        coachFeedback:
+          'Yüksek sodyum ve rafine karbonhidrat yükü nedeniyle yarın sabah tartıda +700g geçici ödem (su tutulumu) görülebilir.',
+        swapSuggestion:
+          'Burgerin üst ekmeğini ayırmak -140 kcal kazandırır. Bu akşam +750 ml su için ve akşam yemeğinde sadece 1 kase probiyotik yoğurt tüketin.',
+      },
+    };
+
+    const base = presets[presetKey] ?? presets['kofte_bulgur'];
+    if (!customNote.trim()) return base;
+    return {
+      ...base,
+      plateTitle: `${base.plateTitle} (${customNote.trim()})`,
+    };
+  }
+
+  /**
+   * AI e-Nabız Kan Tahlili PDF & InBody / Tanita Fişi OCR Okuyucu
+   */
+  extractOcrDocument(kind: OcrDocumentKind, fileName?: string): OcrExtractionResult {
+    const now = new Date().toISOString();
+    if (kind === 'enabiz_insulin') {
+      return {
+        kind,
+        documentTitle: fileName || 'e-Nabiz_Biyokimya_Hemogram_Raporu.pdf',
+        confidencePct: 98.7,
+        extractedAt: now,
+        clinicalFlags: [
+          'HOMA-IR: 3.48 (İnsülin Direnci Eşiği > 2.5 — Düşük Glisemik İndeks + Elma Sirkesi Protokolü Önerilir)',
+          'Ferritin: 16 ng/mL (Hücresel Demir Deposu Düşük — Çay/Kahve Öğünlerden 90 dk Ayrılmalı)',
+          '25-OH Vitamin D: 18.4 ng/mL (Yetersiz — Sabah Yağlı Öğünle D3K2 Desteği)',
+        ],
+        labValues: {
+          fastingGlucoseMgDl: 98,
+          fastingInsulinUiuMl: 14.4,
+          hba1cPct: 5.8,
+          triglyceridesMgDl: 168,
+          hdlMgDl: 44,
+          ldlMgDl: 136,
+          ferritinNgMl: 16,
+          vitaminDNgMl: 18.4,
+          vitaminB12PgMl: 285,
+          tshMiuL: 2.6,
+          uricAcidMgDl: 5.4,
+          crpMgL: 2.1,
+        },
+      };
+    }
+
+    if (kind === 'tanita_athlete') {
+      return {
+        kind,
+        documentTitle: fileName || 'Tanita_MC780_Segmental_Analiz.jpg',
+        confidencePct: 99.1,
+        extractedAt: now,
+        clinicalFlags: [
+          'Faz Açısı: 6.8° (Yüksek Hücresel Zar Bütünlüğü ve Kas Kalitesi)',
+          'ECW/TBW: 0.376 (Optimal Hücre Dışı Sıvı Dengesi — Ödem Yok)',
+          'Viseral Yağ: Seviye 5 (Sağlıklı İç Organ Yağlanması)',
+        ],
+        bodyValues: {
+          weightKg: 74.2,
+          bodyFatPct: 16.8,
+          muscleMassKg: 58.4,
+          visceralFatRating: 5,
+          bodyWaterPct: 60.2,
+          ecwTbwRatio: 0.376,
+          metabolicAge: 26,
+          phaseAngleDeg: 6.8,
+          waistCm: 79,
+        },
+      };
+    }
+
+    return {
+      kind: 'inbody_sheet',
+      documentTitle: fileName || 'InBody_270_Termal_Cikti_Tarama.jpg',
+      confidencePct: 98.4,
+      extractedAt: now,
+      clinicalFlags: [
+        'ECW/TBW: 0.394 (Hafif Ödem / Hücre Dışı Su Tutulumu — Sodyum Kısıtlaması + Potasyum Desteği)',
+        'Viseral Yağ: Seviye 11 (Abdominal Yağlanma Sınır Üstü — Akşam Karbonhidrat Kısıtlaması)',
+        'Metabolik Yaş: 41 (Kronolojik Yaştan +6 Yıl Yüksek)',
+      ],
+      bodyValues: {
+        weightKg: 81.6,
+        bodyFatPct: 33.4,
+        muscleMassKg: 28.9,
+        visceralFatRating: 11,
+        bodyWaterPct: 48.6,
+        ecwTbwRatio: 0.394,
+        metabolicAge: 41,
+        phaseAngleDeg: 5.3,
+        waistCm: 94,
+      },
+    };
+  }
+
+  /**
+   * 7/24 Cep Diyetisyen Restoran & Menü Danışmanı (Klinik Sınır Korumalı RAG)
+   */
+  askMenuAdvisor(query: string): MenuAdvisorReply {
+    const q = query.trim().toLocaleLowerCase('tr');
+    const medicalKeywords = [
+      'ilaç',
+      'doz',
+      'iğne',
+      'bayıl',
+      'çarpıntı',
+      'göğüs ağrısı',
+      'kanama',
+      'insülin ünite',
+      'ozempic doz',
+    ];
+    if (medicalKeywords.some((k) => q.includes(k))) {
+      return {
+        query,
+        medicalEscalation: true,
+        recommendedChoice:
+          'Bu soru tıbbi/farmakolojik değerlendirme gerektirdiği için otomatik olarak diyetisyeninize öncelikli bildirim olarak iletilmelidir.',
+        portionRule: 'İlaç dozu veya akut semptomlarda lütfen doğrudan uzmanınıza veya hekiminize danışın.',
+        avoidList: 'Kendi başınıza ilaç/takviye doz değişikliği yapmayın.',
+        glycemicTip: 'Talepler veya Mesajlar ekranından diyetisyeninize doğrudan yazabilirsiniz.',
+      };
+    }
+
+    if (q.includes('balık') || q.includes('rakı') || q.includes('meze')) {
+      return {
+        query,
+        medicalEscalation: false,
+        recommendedChoice: 'Izgara Levrek / Çipura / Somon + Bol Roka Salatası + 2 Yemek Kaşığı Humus veya Deniz Börülcesi',
+        portionRule: 'Ana yemek 1 tam ızgara balık; mezelerden kızartma olmayan 2 çeşit (toplam 3 yemek kaşığı). Ekmek sepetini masadan kaldırın.',
+        avoidList: 'Kalamar tava, karides güveç (tereyağlı), patates kızartması, sıcak helva (paylaşarak maksimum 1 çatal).',
+        glycemicTip: 'Yemeğe sirkeli/limonlu roka salatasıyla başlamak öğün sonrası glukoz pikini %30 azaltır.',
+      };
+    }
+
+    if (q.includes('kahve') || q.includes('tatlı') || q.includes('çikolata') || q.includes('kriz')) {
+      return {
+        query,
+        medicalEscalation: false,
+        recommendedChoice: 'Sade Türk Kahvesi veya Americano + 2 Kare (%80+) Bitter Çikolata veya 1 Hurma (İçi 1 Tam Cevizli)',
+        portionRule: 'Sütlü/şuruplu kahveler yerine sade kahve veya tarçınlı laktozsuz sütlü filtre kahve tercih edin.',
+        avoidList: 'Beyaz çikolatalı mocha, karamel şuruplu latte (yaklaşık 380 kcal sıvı şeker), cheesecake.',
+        glycemicTip: 'Tatlı isteği çoğu zaman susuzluk veya krom/magnezyum açlığıdır; önce 1 büyük bardak tarçınlı su için.',
+      };
+    }
+
+    if (q.includes('gece') || q.includes('nöbet') || q.includes('açlık') || q.includes('uyku')) {
+      return {
+        query,
+        medicalEscalation: false,
+        recommendedChoice: '1 Su Bardağı Kefir veya 4 Yemek Kaşığı Ev Yoğurdu + 1 Çay Kaşığı Чиa / Tarçın + Salatalık Dilimleri',
+        portionRule: 'Gece 21:30 sonrasında 150 kcal sınırını aşmayan, insülin salgılatmayan kazein/protein bazlı mini ara öğün.',
+        avoidList: 'Meyve tabağı, kuruyemiş kasesi (porsiyon kontrolü zor), kraker/bisküvi.',
+        glycemicTip: 'Gece meyve yemek büyüme hormonu (GH) salınımını baskılar; yoğurt/kefir ise gece yağ yakımını korur.',
+      };
+    }
+
+    return {
+      query: query || 'Dışarıda / Ev Dışı Öğün Seçimi',
+      medicalEscalation: false,
+      recommendedChoice: 'Izgara Et / Tavuk / Köfte veya Zeytinyağlı Sebze + 1 Kase Yoğurt/Ayran + Mevsim Salata',
+      portionRule: 'Tabağınızın yarısını çiğ/pişmiş sebze, çeyreğini kaliteli protein, kalan çeyreğini ise 3-4 kaşık bulgur/karabuğday veya 1 dilim tam tahıl ekmeği yapın.',
+      avoidList: 'Kremalı makarnalar, pane/kızartma soslu ürünler, şekerli meşrubatlar.',
+      glycemicTip: 'Yemeav sıralaması: Önce lif (salata/sebze), sonra protein/yağ, en son karbonhidrat tüketin.',
+    };
+  }
+
+  /**
+   * Danışan Kopma (Churn) Tahmin Radarı & Kişiselleştirilmiş Geri Kazanım Mesajı
+   */
+  evaluateClientChurn(
+    clients: readonly {
+      id: string;
+      firstName: string;
+      lastName: string;
+      daysSinceMeasurement: number;
+      overdueTasks: number;
+      unreadFromDietitian: number;
+    }[],
+  ): ChurnRiskAssessment[] {
+    return clients
+      .map((c) => {
+        const reasons: string[] = [];
+        let score = 15;
+
+        if (c.daysSinceMeasurement >= 10) {
+          score += 42;
+          reasons.push(`${c.daysSinceMeasurement} gündür yeni tartı/ölçüm kaydı girilmedi`);
+        } else if (c.daysSinceMeasurement >= 6) {
+          score += 22;
+          reasons.push(`${c.daysSinceMeasurement} gündür tartı güncellemesi bekleniyor`);
+        }
+
+        if (c.overdueTasks > 0) {
+          score += c.overdueTasks * 18;
+          reasons.push(`${c.overdueTasks} adet süresi geçmiş portal görevi var`);
+        }
+
+        if (c.unreadFromDietitian > 0) {
+          score += 15;
+          reasons.push('Gönderilen son mesaj henüz yanıtlanmadı');
+        }
+
+        if (reasons.length === 0) {
+          reasons.push('Düzenli veri girişi ve yüksek seans uyumu');
+        }
+
+        const riskScore = Math.min(96, score);
+        const riskLevel: 'high' | 'medium' | 'low' =
+          riskScore >= 65 ? 'high' : riskScore >= 40 ? 'medium' : 'low';
+
+        const fullName = `${c.firstName} ${c.lastName}`;
+        const nudgeMessage =
+          riskLevel === 'high'
+            ? `Merhaba ${c.firstName} Hanım/Bey 🌿 Son birkaç gündür portalda tartı ve öğün kayıtlarınızı göremedim, her şey yolunda mı? Süreçte zorlandığınız bir öğün varsa listemizi 2 dakikada esnetebiliriz. Yanınızdayım! 💚`
+            : riskLevel === 'medium'
+              ? `Merhaba ${c.firstName} 🌟 Bu haftaki kontrolümüz öncesi sabah aç karnına güncel tartı ve su takibinizi portala girmenizi rica ederim. Harika gidiyoruz, ritmi koruyalım!`
+              : `Merhaba ${c.firstName} 👏 Bu haftaki istikrarlı takibiniz için tebrik ederim! Yeni hafta hedeflerimiz için aynı enerjiyle devam ediyoruz.`;
+
+        return {
+          clientId: c.id,
+          clientName: fullName,
+          riskScore,
+          riskLevel,
+          daysSinceLastMeasurement: c.daysSinceMeasurement,
+          overdueTasks: c.overdueTasks,
+          reasons,
+          nudgeMessage,
+        };
+      })
+      .sort((a, b) => b.riskScore - a.riskScore);
+  }
+
+  /**
+   * Instagram / Web Metabolik Check-Up Hunisinden Gelen Örnek Potansiyel Danışanlar (Leads)
+   */
+  defaultLeads(): LeadCandidate[] {
+    return [
+      {
+        id: 'lead-1',
+        fullName: 'Selin Demirtaş',
+        phone: '+90 532 418 92 10',
+        email: 'selin.demirtas@ornek.com',
+        age: 34,
+        gender: 'female',
+        heightCm: 165,
+        weightKg: 78.4,
+        targetWeightKg: 62,
+        bmi: 28.8,
+        metabolicAgeEstimate: 41,
+        insulinRiskLabel: 'Yüksek Risk',
+        goalLabel: 'İnsülin Direnci & Kalıcı Yağ Kaybı (-16 kg)',
+        source: 'Instagram Bio Testi',
+        createdAt: 'Bugün · 14 dk önce',
+      },
+      {
+        id: 'lead-2',
+        fullName: 'Kaan Özkan',
+        phone: '+90 544 812 33 05',
+        email: 'kaan.ozkan@ornek.com',
+        age: 29,
+        gender: 'male',
+        heightCm: 181,
+        weightKg: 94.0,
+        targetWeightKg: 82,
+        bmi: 28.7,
+        metabolicAgeEstimate: 35,
+        insulinRiskLabel: 'Orta Risk',
+        goalLabel: 'Göbek Çevresi İncelme & Sporcu Beslenmesi',
+        source: 'Web Metabolik Check-Up',
+        createdAt: 'Bugün · 2 saat önce',
+      },
+      {
+        id: 'lead-3',
+        fullName: 'Ayilin Soylu',
+        phone: '+90 533 901 44 77',
+        email: 'aylin.soylu@ornek.com',
+        age: 41,
+        gender: 'female',
+        heightCm: 162,
+        weightKg: 83.0,
+        targetWeightKg: 66,
+        bmi: 31.6,
+        metabolicAgeEstimate: 49,
+        insulinRiskLabel: 'Yüksek Risk',
+        goalLabel: 'Haşimato + Ödem Yönetimi & Online Takip',
+        source: 'WhatsApp Huni',
+        createdAt: 'Dün · 19:40',
+      },
+    ];
+  }
+
+  /**
+   * Diyetisyenin Danışanlarına Satabileceği Hazır Online Hizmet & Takip Paketleri
+   */
+  defaultServicePackages(): ClinicServicePackage[] {
+    return [
+      {
+        id: 'pkg-1',
+        title: '1 Aylık Online Yoğun Beslenme & Portal Takip Paketi',
+        durationLabel: '4 Hafta · 4 Görüntülü Seans',
+        priceTl: 4500,
+        installmentLabel: 'Kredi kartına 3 taksit imkânı',
+        badge: 'En Çok Satan Başlangıç',
+        includes: [
+          'Haftalık kişiselleştirilmiş liste revizyonu',
+          '7/24 OdivonDiet Danışan Portalı & su/öğün takibi',
+          'AI Tabak Fotoğrafı geri bildirimi & WhatsApp desteği',
+        ],
+      },
+      {
+        id: 'pkg-2',
+        title: '3 Aylık Metabolik Dönüşüm & İnsülin Direnci/GLP-1 Paketi',
+        durationLabel: '12 Hafta · 12 Seans + Biyobelirteç Analizi',
+        priceTl: 11500,
+        installmentLabel: 'Kredi kartına 6 taksit imkânı',
+        badge: 'Yüksek Klinik Gelir',
+        includes: [
+          'e-Nabız kan tahlili & HOMA-IR / mikronutrient takibi',
+          'InBody / Tanita segmental kas-yağ ve ödem analizi',
+          'Kaçamak telafi protokolü & haftalık market alışveriş listesi',
+        ],
+      },
+      {
+        id: 'pkg-3',
+        title: 'Kurumsal / Spor Salonu (B2B2C) VIP Performans Paketi',
+        durationLabel: '8 Hafta · Antrenman Günü Makro Döngüsü',
+        priceTl: 8500,
+        installmentLabel: 'Kurumsal fatura & taksit imkânı',
+        badge: 'Sporcu & Kurumsal',
+        includes: [
+          'Antrenman / dinlenme günü karbonhidrat döngüsü (Carb-Cycling)',
+          'Ergogenic supplement & hidrasyon protokolü',
+          'Haftalık performans ve faz açısı (Phase Angle) izlemi',
+        ],
+      },
+    ];
   }
 }

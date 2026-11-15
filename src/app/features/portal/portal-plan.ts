@@ -3,6 +3,8 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { DietStore } from '../../core/data/diet-store';
 import { MemberPortal } from '../../core/data/member-portal';
+import { Notify } from '../../core/notify/notify';
+import { AiNutripilotService } from '../../core/services/ai-nutripilot.service';
 import { buildGroceryList, daysBetween } from '../../domain/diet-calc';
 import {
   EXCHANGE_GROUP_LABELS,
@@ -282,6 +284,138 @@ import { ProgressBar } from '../../shared/ui/progress-bar';
             }
           </section>
         </div>
+
+        <!-- 3. AI Tabak Fotoğrafı Analizi (Meal Vision) & 7/24 AI Restoran Danışmanı -->
+        <div class="no-print grid gap-6 lg:grid-cols-2">
+          <!-- AI Tabak Fotoğrafı Analizi -->
+          <section class="odv-card space-y-4 p-5" aria-label="AI Tabak Fotoğrafı Analizi">
+            <div class="flex items-start justify-between gap-2">
+              <div>
+                <span class="odv-eyebrow text-violet-700 dark:text-violet-300">AI Meal Vision</span>
+                <h2 class="odv-section-title">Tabak Fotoğrafından Porsiyon & Makro Analizi</h2>
+                <p class="text-xs text-slate-500">
+                  Öğün fotoğrafınızı yükleyin veya tabağınızdaki kombinasyonu seçin; AI kalorisini ve planınıza uyumunu hesaplasın.
+                </p>
+              </div>
+              <span class="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-extrabold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-200">
+                %{{ plateAnalysis().adherenceScorePct }} Uyum
+              </span>
+            </div>
+
+            <div class="flex flex-wrap gap-1.5" role="group" aria-label="Tabak seçimi">
+              @for (p of plateOptions; track p.key) {
+                <button
+                  type="button"
+                  class="rounded-xl border px-3 py-1.5 text-xs font-bold transition"
+                  [class.border-violet-600]="selectedPlateKey() === p.key"
+                  [class.bg-violet-600]="selectedPlateKey() === p.key"
+                  [class.text-white]="selectedPlateKey() === p.key"
+                  [class.border-slate-200]="selectedPlateKey() !== p.key"
+                  (click)="selectPlate(p.key)"
+                >
+                  {{ p.label }}
+                </button>
+              }
+            </div>
+
+            <label class="block">
+              <span class="odv-label">Veya öğün fotoğrafı yükleyin (AI Görüntü Tanıma)</span>
+              <input
+                type="file"
+                accept="image/*"
+                class="odv-input text-xs"
+                (change)="onPlatePhotoSelected($event)"
+              />
+            </label>
+
+            <div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-3.5 space-y-2.5 text-xs dark:border-slate-800 dark:bg-slate-900/50">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <strong class="text-slate-900 dark:text-white">{{ plateAnalysis().plateTitle }}</strong>
+                <span class="font-extrabold tabular text-violet-700 dark:text-violet-300">
+                  {{ plateAnalysis().totalKcal }} kcal · Gİ Yükü: {{ plateAnalysis().glycemicLoad }}
+                </span>
+              </div>
+              <div class="grid grid-cols-4 gap-2 text-center">
+                <div class="rounded-lg bg-white p-1.5 dark:bg-slate-900">
+                  <span class="block text-[10px] text-slate-500">Protein</span>
+                  <strong class="tabular">{{ plateAnalysis().proteinG }}g</strong>
+                </div>
+                <div class="rounded-lg bg-white p-1.5 dark:bg-slate-900">
+                  <span class="block text-[10px] text-slate-500">Karb</span>
+                  <strong class="tabular">{{ plateAnalysis().carbG }}g</strong>
+                </div>
+                <div class="rounded-lg bg-white p-1.5 dark:bg-slate-900">
+                  <span class="block text-[10px] text-slate-500">Yağ</span>
+                  <strong class="tabular">{{ plateAnalysis().fatG }}g</strong>
+                </div>
+                <div class="rounded-lg bg-white p-1.5 dark:bg-slate-900">
+                  <span class="block text-[10px] text-slate-500">Lif</span>
+                  <strong class="tabular">{{ plateAnalysis().fiberG }}g</strong>
+                </div>
+              </div>
+              <p class="text-emerald-800 dark:text-emerald-300">{{ plateAnalysis().coachFeedback }}</p>
+              <p class="text-slate-600 dark:text-slate-300"><strong>Öneri:</strong> {{ plateAnalysis().swapSuggestion }}</p>
+            </div>
+
+            <button
+              type="button"
+              class="odv-btn-soft w-full justify-center !text-xs"
+              (click)="sendPlateToDietitian()"
+            >
+              <span class="material-symbols-rounded !text-base">send</span>
+              Bu Tabak Analizini Diyetisyenime Gönder
+            </button>
+          </section>
+
+          <!-- 7/24 AI Restoran & Menü Danışmanı -->
+          <section class="odv-card space-y-4 p-5" aria-label="7/24 AI Restoran ve Menü Danışmanı">
+            <div>
+              <span class="odv-eyebrow text-emerald-700 dark:text-emerald-300">7/24 Cep Diyetisyen Asistanı</span>
+              <h2 class="odv-section-title">Restoranda veya Gece Açlığında Ne Seçmeliyim?</h2>
+              <p class="text-xs text-slate-500">
+                Bulunduğunuz ortamı seçin veya menüdeki yemeği yazın; aktif planınıza uygun en doğru seçimi öğrenin.
+              </p>
+            </div>
+
+            <div class="flex flex-wrap gap-1.5">
+              @for (q of advisorQuickPrompts; track q) {
+                <button
+                  type="button"
+                  class="rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-bold transition hover:border-emerald-500 dark:border-slate-700"
+                  (click)="advisorQuery.set(q)"
+                >
+                  {{ q }}
+                </button>
+              }
+            </div>
+
+            <label class="block">
+              <span class="odv-label">Menü veya besin sorunuz</span>
+              <input
+                type="text"
+                class="odv-input text-xs"
+                placeholder="Örn: Balık restorandayım hangi mezeyi seçeyim?"
+                [value]="advisorQuery()"
+                (input)="advisorQuery.set($any($event.target).value)"
+              />
+            </label>
+
+            <div class="rounded-2xl border border-emerald-200/80 bg-emerald-50/50 p-4 space-y-2 text-xs dark:border-emerald-900/60 dark:bg-emerald-950/20">
+              @if (advisorReply().medicalEscalation) {
+                <p class="font-extrabold text-rose-700 dark:text-rose-300">
+                  ⚠️ Tıbbi Güvenlik Uyarısı: {{ advisorReply().recommendedChoice }}
+                </p>
+              } @else {
+                <p><strong>✅ En İyi Seçim:</strong> {{ advisorReply().recommendedChoice }}</p>
+                <p><strong>📏 Porsiyon Kuralı:</strong> {{ advisorReply().portionRule }}</p>
+                <p><strong>🚫 Kaçınılacaklar:</strong> {{ advisorReply().avoidList }}</p>
+                <p class="text-emerald-800 dark:text-emerald-300">
+                  <strong>💡 Glisemik İpucu:</strong> {{ advisorReply().glycemicTip }}
+                </p>
+              }
+            </div>
+          </section>
+        </div>
       } @else {
         <div class="odv-card">
           <app-empty-state
@@ -315,9 +449,32 @@ import { ProgressBar } from '../../shared/ui/progress-bar';
 export class PortalPlan {
   private readonly member = inject(MemberPortal);
   private readonly diet = inject(DietStore);
+  private readonly ai = inject(AiNutripilotService);
+  private readonly notify = inject(Notify);
   readonly statusLabels = PLAN_STATUS_LABELS;
   readonly exchangeLabels = EXCHANGE_GROUP_LABELS;
   readonly giLabels = GI_LABELS;
+
+  readonly selectedPlateKey = signal<string>('kofte_bulgur');
+  readonly plateCustomNote = signal<string>('');
+  readonly plateOptions = [
+    { key: 'kofte_bulgur', label: '🥩 Köfte & Bulgur' },
+    { key: 'somon_kinoa', label: '🐟 Somon & Kinoa' },
+    { key: 'serpme_kahvalti', label: '🍳 Kahvaltı Tabağı' },
+    { key: 'disarida_burger', label: '🍔 Restoran Burger' },
+  ] as const;
+  readonly plateAnalysis = computed(() =>
+    this.ai.analyzeMealPlate(this.selectedPlateKey(), this.plateCustomNote()),
+  );
+
+  readonly advisorQuery = signal<string>('Balık restorandayım, ne seçeyim?');
+  readonly advisorQuickPrompts = [
+    'Balık restorandayım, ne seçeyim?',
+    'Kahve yanına tatlı krizi geldi',
+    'Gece açlığı / nöbette ne yenir?',
+    'Misafirlikte ev yemeği seçimi',
+  ] as const;
+  readonly advisorReply = computed(() => this.ai.askMenuAdvisor(this.advisorQuery()));
 
   readonly active = computed(
     () => this.member.plans().find((p) => p.status === 'active') ?? null,
@@ -404,5 +561,26 @@ export class PortalPlan {
 
   print(): void {
     window.print();
+  }
+
+  selectPlate(key: string): void {
+    this.selectedPlateKey.set(key);
+    this.plateCustomNote.set('');
+  }
+
+  onPlatePhotoSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    this.plateCustomNote.set(file.name);
+  }
+
+  sendPlateToDietitian(): void {
+    const a = this.plateAnalysis();
+    const msg =
+      `🍽️ AI Tabak Analizi Paylaşımı: ${a.plateTitle}\n` +
+      `Toplam: ${a.totalKcal} kcal (P: ${a.proteinG}g, K: ${a.carbG}g, Y: ${a.fatG}g) · Plan Uyumu: %${a.adherenceScorePct}`;
+    this.member.send(msg);
+    this.notify.success('Tabak analizi gönderildi', 'Diyetisyeninizin mesaj ekranına iletildi.');
   }
 }

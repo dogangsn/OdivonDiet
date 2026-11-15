@@ -12,7 +12,10 @@ export interface NavigationGroup {
 export const PRODUCT_NAVIGATION: readonly NavigationGroup[] = [
   {
     label: 'Genel',
-    items: [{ path: '/overview', icon: 'space_dashboard', label: 'Genel bakış' }],
+    items: [
+      { path: '/overview', icon: 'space_dashboard', label: 'Genel bakış' },
+      { path: '/ai-copilot', icon: 'auto_awesome', label: 'AI NutriPilot & Büyüme' },
+    ],
   },
   {
     label: 'Danışan takibi',

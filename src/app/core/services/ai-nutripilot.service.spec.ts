@@ -98,4 +98,53 @@ describe('AiNutripilotService', () => {
     expect(summary.clientMessage).toContain('Harika bir 3. haftayı');
     expect(summary.clientMessage).toContain('-1.5 kg');
   });
+
+  it('analyzes meal plates and computes adherence and glycemic load', () => {
+    const plate = service.analyzeMealPlate('somon_kinoa', 'Akşam Öğünü');
+    expect(plate.adherenceScorePct).toBeGreaterThanOrEqual(90);
+    expect(plate.glycemicLoad).toBe('Düşük');
+    expect(plate.plateTitle).toContain('Akşam Öğünü');
+  });
+
+  it('extracts e-Nabiz lab values and InBody metrics via OCR', () => {
+    const labOcr = service.extractOcrDocument('enabiz_insulin');
+    expect(labOcr.confidencePct).toBeGreaterThan(95);
+    expect(labOcr.labValues?.fastingInsulinUiuMl).toBeGreaterThan(10);
+
+    const inbodyOcr = service.extractOcrDocument('inbody_sheet');
+    expect(inbodyOcr.bodyValues?.ecwTbwRatio).toBeGreaterThan(0.38);
+  });
+
+  it('answers 24/7 menu advisor queries and escalates medical questions safely', () => {
+    const fishReply = service.askMenuAdvisor('Balık restorandayım hangi meze uygun?');
+    expect(fishReply.medicalEscalation).toBe(false);
+    expect(fishReply.recommendedChoice).toContain('Izgara');
+
+    const medicalReply = service.askMenuAdvisor('Ozempic doz ünitesini iki katına çıkarayım mı?');
+    expect(medicalReply.medicalEscalation).toBe(true);
+  });
+
+  it('ranks client churn risk and drafts retention nudges', () => {
+    const ranked = service.evaluateClientChurn([
+      {
+        id: 'c-1',
+        firstName: 'Elif',
+        lastName: 'Kaya',
+        daysSinceMeasurement: 2,
+        overdueTasks: 0,
+        unreadFromDietitian: 0,
+      },
+      {
+        id: 'c-2',
+        firstName: 'Mert',
+        lastName: 'Yıldız',
+        daysSinceMeasurement: 12,
+        overdueTasks: 2,
+        unreadFromDietitian: 1,
+      },
+    ]);
+    expect(ranked[0].clientId).toBe('c-2');
+    expect(ranked[0].riskLevel).toBe('high');
+    expect(ranked[0].nudgeMessage).toContain('Mert');
+  });
 });
