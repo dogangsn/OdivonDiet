@@ -930,7 +930,7 @@ export class AuthPage {
           await this.router.navigateByUrl('/verify-email');
           return;
         }
-        this.error.set(error instanceof PortalAccessError ? error.message : this.genericError);
+        this.error.set(error instanceof PortalAccessError ? error.message : authErrorMessage(error, this.genericError));
       } finally {
         this.busy.set(false);
       }
@@ -952,4 +952,20 @@ export class AuthPage {
     await this.auth.continueMemberDemo(clientId);
     await this.router.navigateByUrl(this.auth.homePath());
   }
+}
+
+/** Turkish message for Firebase Auth and MainAPI registration errors. */
+function authErrorMessage(error: unknown, fallback: string): string {
+  const code = (error as { code?: unknown } | null)?.code;
+  if (typeof code !== 'string') return fallback;
+  if (['auth/invalid-credential', 'auth/wrong-password', 'auth/user-not-found', 'auth/invalid-email'].includes(code)) {
+    return 'E-posta veya şifre hatalı.';
+  }
+  if (code === 'auth/too-many-requests') return 'Çok fazla deneme yapıldı. Biraz sonra tekrar deneyin.';
+  if (code === 'auth/user-disabled') return 'Bu hesap devre dışı bırakılmış.';
+  if (code === 'auth/network-request-failed') return 'İnternet bağlantınızı kontrol edin.';
+  if (/EXISTS|ALREADY/i.test(code) || code === 'auth/email-already-in-use') {
+    return 'Bu e-posta ile zaten bir hesap var. Giriş yapmayı deneyin.';
+  }
+  return fallback;
 }

@@ -75,23 +75,39 @@ export class FirebaseIdentity {
     return (await signInWithEmailAndPassword(this.auth, email, password)).user;
   }
 
-  async register(name: string, email: string, password: string): Promise<User> {
-    await this.initialize();
-    if (!this.auth) throw new Error('Firebase Auth is not configured.');
-    const { createUserWithEmailAndPassword, updateProfile } = await import('firebase/auth');
-    const user = (await createUserWithEmailAndPassword(this.auth, email, password)).user;
-    await updateProfile(user, { displayName: name });
-    await this.sendVerification(user);
-    return user;
+  /**
+   * Accounts are created by MainAPI (`/identity/register`), which creates the Firebase user, the
+   * diet tenant with this user as owner, and sends the verification e-mail. We then sign in so the
+   * verification screen can poll and resend.
+   */
+  async register(name: string, email: string, password: string, practice = ''): Promise<User> {
+    await this.mainApi('/identity/register', {
+      email,
+      password,
+      displayName: name,
+      tenantName: practice.trim() || name,
+      module: 'diet',
+    });
+    return this.signIn(email, password);
   }
 
-  /** Sends Firebase's verification e-mail; the link brings the user back to `/verify-email`. */
+  /** Asks MainAPI to send the verification e-mail again (its link confirms on MainAPI). */
   async sendVerification(user = this.auth?.currentUser ?? null): Promise<void> {
-    if (!user) throw new Error('No signed-in user to verify.');
-    const { sendEmailVerification } = await import('firebase/auth');
-    await sendEmailVerification(user, {
-      url: `${globalThis.location?.origin ?? ''}/verify-email`,
+    if (!user?.email) throw new Error('No signed-in user to verify.');
+    await this.mainApi('/identity/resend-verification', { email: user.email });
+  }
+
+  private async mainApi(path: string, body: unknown): Promise<void> {
+    const response = await fetch(`${environment.apiBaseUrl}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify(body),
     });
+    if (response.ok) return;
+    const json = (await response.json().catch(() => null)) as {
+      error?: { code?: string; message?: string };
+    } | null;
+    throw new MainApiError(response.status, json?.error?.code ?? 'HTTP_ERROR', json?.error?.message ?? '');
   }
 
   /** Re-reads the signed-in user from Firebase and reports whether the e-mail is verified. */
@@ -122,5 +138,15 @@ export class FirebaseIdentity {
       const { signOut } = await import('firebase/auth');
       await signOut(this.auth);
     }
+  }
+}
+
+export class MainApiError extends Error {
+  constructor(
+    readonly status: number,
+    readonly code: string,
+    message: string,
+  ) {
+    super(message || code);
   }
 }

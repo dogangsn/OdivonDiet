@@ -231,7 +231,7 @@ export class AuthStore {
       });
       return;
     }
-    const user = await this.identity.register(name, email, password);
+    const user = await this.identity.register(name, email, password, practice);
     this.setPending({
       name: user.displayName || name,
       email,
